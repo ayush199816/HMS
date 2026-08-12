@@ -61,7 +61,7 @@ app.use('*', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+if (process.env.VERCEL) {
   module.exports = app;
 } else {
   app.listen(PORT, () => {

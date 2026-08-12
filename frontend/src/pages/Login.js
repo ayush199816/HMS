@@ -58,13 +58,13 @@ const Login = () => {
                   Email Address
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Mail style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', height: '16px', width: '16px', color: '#9ca3af' }} />
+                  <Mail style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', height: '16px', width: '16px', color: '#9ca3af' }} />
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleInputChange}
-                    style={{ width: '100%', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '40px', paddingRight: '16px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '48px', paddingRight: '16px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' }}
                     placeholder="Enter your email"
                     required
                   />
@@ -76,20 +76,20 @@ const Login = () => {
                   Password
                 </label>
                 <div style={{ position: 'relative' }}>
-                  <Lock style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', height: '16px', width: '16px', color: '#9ca3af' }} />
+                  <Lock style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', height: '16px', width: '16px', color: '#9ca3af' }} />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={formData.password}
                     onChange={handleInputChange}
-                    style={{ width: '100%', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '40px', paddingRight: '40px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', paddingTop: '8px', paddingBottom: '8px', paddingLeft: '48px', paddingRight: '48px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' }}
                     placeholder="Enter your password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
+                    style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af' }}
                   >
                     {showPassword ? <EyeOff style={{ height: '16px', width: '16px' }} /> : <Eye style={{ height: '16px', width: '16px' }} />}
                   </button>

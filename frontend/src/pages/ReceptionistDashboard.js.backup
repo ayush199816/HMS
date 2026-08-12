@@ -1,0 +1,1613 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  Users, 
+  Calendar, 
+  CreditCard, 
+  TrendingUp,
+  Activity,
+  AlertCircle
+} from 'lucide-react';
+
+const ReceptionistDashboard = () => {
+  const navigate = useNavigate();
+  const { api, user } = useAuth();
+  const [stats, setStats] = useState({
+    totalPatients: 0,
+    todayAppointments: 0,
+    pendingBills: 0,
+    totalRevenue: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Fetch dashboard statistics
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        // Fetch basic stats
+        const [patientsRes, appointmentsRes, billingRes] = await Promise.all([
+          api.get(`/patients/hospital/${user.hospitalId}?limit=1`),
+          api.get(`/appointments?date=${new Date().toISOString().split('T')[0]}`),
+          api.get(`/billing/hospital/${user.hospitalId}?status=pending&limit=1`)
+        ]);
+        
+        setStats({
+          totalPatients: patientsRes.data.total || 0,
+          todayAppointments: appointmentsRes.data.appointments?.length || 0,
+          pendingBills: billingRes.data.bills?.length || 0,
+          totalRevenue: 0 // Would need additional API call for total revenue
+        });
+      } catch (error) {
+        setError(error.response?.data?.message || 'Failed to fetch dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.hospitalId) {
+      fetchStats();
+    }
+  }, [api, user?.hospitalId]);
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Receptionist Dashboard</h1>
+        <p className="text-gray-600 mt-2">Welcome back, {user?.name}</p>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="alert alert-danger flex items-center mb-6">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          {error}
+        </div>
+      )}
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="card">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Users className="h-8 w-8 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-medium text-gray-900">Total Patients</h3>
+              <p className="text-2xl font-bold text-blue-600">
+                {loading ? '...' : stats.totalPatients}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <Calendar className="h-8 w-8 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-medium text-gray-900">Today's Appointments</h3>
+              <p className="text-2xl font-bold text-green-600">
+                {loading ? '...' : stats.todayAppointments}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <CreditCard className="h-8 w-8 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-medium text-gray-900">Pending Bills</h3>
+              <p className="text-2xl font-bold text-yellow-600">
+                {loading ? '...' : stats.pendingBills}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <TrendingUp className="h-8 w-8 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-medium text-gray-900">Total Revenue</h3>
+              <p className="text-2xl font-bold text-purple-600">
+                ₹{loading ? '...' : stats.totalRevenue.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="card mb-8">
+        <div className="card-header">
+          <h2 className="card-title">Quick Actions</h2>
+          <p className="card-description">Common tasks you can perform</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+          <button
+            onClick={() => navigate('/receptionist/patients')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Users className="h-8 w-8 text-blue-600 mr-4" />
+            <div className="text-left">
+              <h3 className="font-medium text-gray-900">Manage Patients</h3>
+              <p className="text-sm text-gray-500">View and register patients</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/receptionist/appointments')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Calendar className="h-8 w-8 text-green-600 mr-4" />
+            <div className="text-left">
+              <h3 className="font-medium text-gray-900">Appointments</h3>
+              <p className="text-sm text-gray-500">Schedule and manage appointments</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/receptionist/billing')}
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <CreditCard className="h-8 w-8 text-yellow-600 mr-4" />
+            <div className="text-left">
+              <h3 className="font-medium text-gray-900">Billing</h3>
+              <p className="text-sm text-gray-500">Process payments and generate bills</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Recent Activity</h2>
+          <p className="card-description">Latest updates in your hospital</p>
+        </div>
+        <div className="p-6">
+          <div className="text-center text-gray-500">
+            <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p>Recent activity will appear here</p>
+            <p className="text-sm">Navigate to specific sections to see detailed information</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ReceptionistDashboard;
+      }
+      
+      setShowCreateForm(false);
+      setEditingPatient(null);
+      setPatientFormData({
+        name: '',
+        age: '',
+        phone: '',
+        whatsappNumber: '',
+        aadharNumber: '',
+        ayushmanNumber: '',
+        email: '',
+        previousIllnessHistory: '',
+        currentIssues: '',
+        patientType: 'opd'
+      });
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to save patient');
+    }
+  };
+
+  const handleBillingSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const response = await api.post(`/billing/patient/${selectedPatient._id}`, billingFormData);
+      
+      // Update the patient in the list
+      setPatients(prev => prev.map(p => 
+        p._id === selectedPatient._id ? response.data.patient : p
+      ));
+      
+      setSelectedPatient(response.data.patient);
+      setShowBillingForm(false);
+      setBillingFormData({
+        amount: '',
+        description: '',
+        paymentMethod: 'cash'
+      });
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to create bill');
+    }
+  };
+
+  const handlePaymentSubmit = async (billId) => {
+    if (!paymentFormData.utrNumber) {
+      setError('UTR number is required for payment');
+      return;
+    }
+
+    try {
+      const response = await api.post(`/billing/bill/${billId}/pay`, paymentFormData);
+      
+      // Update the patient in the list
+      setPatients(prev => prev.map(p => 
+        p._id === selectedPatient._id ? response.data.patient : p
+      ));
+      
+      setSelectedPatient(response.data.patient);
+      setPaymentFormData({
+        utrNumber: '',
+        paymentMethod: 'cash'
+      });
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to process payment');
+    }
+  };
+
+  const handleEdit = (patient) => {
+    setEditingPatient(patient);
+    setPatientFormData({
+      name: patient.name,
+      age: patient.age.toString(),
+      phone: patient.phone,
+      whatsappNumber: patient.whatsappNumber,
+      aadharNumber: patient.aadharNumber,
+      ayushmanNumber: patient.ayushmanNumber,
+      email: patient.email,
+      previousIllnessHistory: patient.previousIllnessHistory,
+      currentIssues: patient.currentIssues,
+      patientType: patient.patientType
+    });
+    setShowCreateForm(true);
+  };
+
+  const handleViewBilling = (patient) => {
+    setSelectedPatient(patient);
+    setShowBillingForm(true);
+  };
+
+  const handleBookAppointment = async (patient) => {
+    setSelectedPatient(patient);
+    const formData = {
+      ...appointmentFormData,
+      patientId: patient._id,
+      appointmentDate: selectedDate
+    };
+    setAppointmentFormData(formData);
+    setShowAppointmentForm(true);
+    
+    // Calculate initial fee if doctor is pre-selected
+    if (formData.doctorId && formData.appointmentType) {
+      try {
+        const response = await api.post('/fees/calculate', {
+          appointmentType: formData.appointmentType,
+          doctorId: formData.doctorId
+        });
+        
+        setAppointmentFormData(prev => ({
+          ...prev,
+          consultationFee: response.data.calculatedFee
+        }));
+      } catch (error) {
+        console.error('Error calculating initial fee:', error);
+      }
+    }
+  };
+
+  const handleAppointmentSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      const response = await api.post('/appointments', appointmentFormData);
+      
+      // Update selectedDate to match the appointment date
+      setSelectedDate(appointmentFormData.appointmentDate);
+      
+      // Refresh appointments list with the new date
+      if (activeTab === 'appointments') {
+        const appointmentsResponse = await api.get(`/appointments?date=${appointmentFormData.appointmentDate}`);
+        setAppointments(appointmentsResponse.data.appointments);
+      }
+
+      setShowAppointmentForm(false);
+      setAppointmentFormData({
+        patientId: '',
+        doctorId: '',
+        appointmentDate: new Date().toISOString().split('T')[0],
+        symptoms: '',
+        consultationFee: 500,
+        appointmentType: 'consultation',
+        notes: ''
+      });
+      setSelectedPatient(null);
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to book appointment');
+    }
+  };
+
+  const handleAppointmentInputChange = async (e) => {
+    const { name, value } = e.target;
+    const updatedData = { ...appointmentFormData, [name]: value };
+    
+    setAppointmentFormData(updatedData);
+    
+    // Auto-calculate fee when doctor or appointment type changes
+    if (name === 'doctorId' || name === 'appointmentType') {
+      if (updatedData.doctorId && updatedData.appointmentType) {
+        try {
+          const response = await api.post('/fees/calculate', {
+            appointmentType: updatedData.appointmentType,
+            doctorId: updatedData.doctorId
+          });
+          
+          setAppointmentFormData(prev => ({
+            ...prev,
+            consultationFee: response.data.calculatedFee
+          }));
+        } catch (error) {
+          console.error('Error calculating fee:', error);
+        }
+      }
+    }
+  };
+
+  const handleViewDetails = (appointment) => {
+    alert(`Appointment Details:\n\nPatient: ${appointment.patientId?.name || 'N/A'}\nDoctor: Dr. ${appointment.doctorId?.name || 'N/A'}\nDate: ${new Date(appointment.appointmentDate).toLocaleDateString()}\nTime: ${new Date(appointment.appointmentDate).toLocaleTimeString()}\nType: ${appointment.appointmentType}\nStatus: ${appointment.status}\nSymptoms: ${appointment.symptoms}\nNotes: ${appointment.notes || 'N/A'}`);
+  };
+
+  const handleAppointmentPayment = (appointment) => {
+    console.log('Appointment data for payment:', appointment);
+    
+    // First ask for payment method
+    const paymentMethod = prompt('Select payment method:\n1. Cash\n2. UPI\n3. Card\n4. Online\n\nEnter number (1-4):');
+    
+    let selectedMethod = 'cash';
+    let paymentDetails = '';
+    
+    switch(paymentMethod) {
+      case '1':
+        selectedMethod = 'cash';
+        break;
+      case '2':
+        selectedMethod = 'upi';
+        paymentDetails = prompt('Enter UTR number for UPI payment:');
+        if (!paymentDetails) {
+          alert('UTR number is required for UPI payment');
+          return;
+        }
+        break;
+      case '3':
+        selectedMethod = 'card';
+        paymentDetails = prompt('Enter card transaction number:');
+        if (!paymentDetails) {
+          alert('Card transaction number is required');
+          return;
+        }
+        break;
+      case '4':
+        selectedMethod = 'online';
+        paymentDetails = prompt('Enter online transaction reference number:');
+        if (!paymentDetails) {
+          alert('Transaction reference is required for online payment');
+          return;
+        }
+        break;
+      default:
+        alert('Invalid payment method selected');
+        return;
+    }
+    
+    setSelectedAppointment(appointment);
+    setAppointmentBillData({
+      amount: appointment.consultationFee || 500,
+      description: `Consultation fee - ${appointment.appointmentType}`,
+      paymentMethod: selectedMethod,
+      utrNumber: paymentDetails
+    });
+    setShowAppointmentPayment(true);
+  };
+
+  const handleAppointmentBillSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      console.log('Frontend: Making billing API call');
+      console.log('Patient ID:', selectedAppointment.patientId._id);
+      console.log('Bill data:', appointmentBillData);
+      
+      // Create bill for the patient
+      const response = await api.post(`/billing/patient/${selectedAppointment.patientId._id}`, appointmentBillData);
+      console.log('Frontend: Billing API response:', response);
+      const bill = response.data.bill;
+      
+      // Process payment - mark bill as paid
+      if (appointmentBillData.paymentMethod === 'cash') {
+        // For cash payments, mark as paid immediately
+        await api.post(`/billing/bill/${bill._id}/pay`, {
+          utrNumber: 'CASH_PAYMENT',
+          paymentMethod: 'cash'
+        });
+        console.log('Frontend: Cash payment processed');
+      } else if (appointmentBillData.utrNumber) {
+        // For digital payments, use the provided UTR/transaction number
+        await api.post(`/billing/bill/${bill._id}/pay`, {
+          utrNumber: appointmentBillData.utrNumber,
+          paymentMethod: appointmentBillData.paymentMethod
+        });
+        console.log('Frontend: Digital payment processed');
+      }
+
+      // Update appointment with payment status
+      console.log('Frontend: Updating appointment payment status');
+      const appointmentUpdateData = {
+        paymentStatus: 'paid',
+        paymentMethod: appointmentBillData.paymentMethod,
+        paymentAmount: appointmentBillData.amount
+      };
+      console.log('Frontend: Appointment payment update data:', appointmentUpdateData);
+      
+      await api.patch(`/appointments/${selectedAppointment._id}/status`, appointmentUpdateData);
+      console.log('Frontend: Appointment payment status updated successfully');
+
+      // Generate and print bill
+      printBill(bill, selectedAppointment, appointmentBillData);
+
+      // Refresh appointments and bills
+      if (activeTab === 'appointments') {
+        const appointmentsResponse = await api.get(`/appointments?date=${selectedDate}`);
+        setAppointments(appointmentsResponse.data.appointments);
+      }
+      if (activeTab === 'billing') {
+        const billingResponse = await api.get(`/billing/hospital/${user.hospitalId}`);
+        setBills(billingResponse.data.bills);
+      }
+
+      setShowAppointmentPayment(false);
+      setSelectedAppointment(null);
+      setAppointmentBillData({
+        amount: '',
+        description: '',
+        paymentMethod: 'cash',
+        utrNumber: ''
+      });
+    } catch (error) {
+      console.error('Frontend: Billing API error:', error);
+      console.error('Frontend: Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Failed to process payment');
+    }
+  };
+
+  const printBill = (bill, appointment, billData) => {
+    const billContent = `
+========================================
+           HOSPITAL BILL
+========================================
+
+Bill Number: ${bill.billNumber}
+Date: ${new Date(bill.billDate).toLocaleDateString()}
+Time: ${new Date().toLocaleTimeString()}
+
+PATIENT INFORMATION:
+Name: ${appointment.patientId?.name || 'N/A'}
+Phone: ${appointment.patientId?.phone || 'N/A'}
+Age: ${appointment.patientId?.age || 'N/A'}
+
+DOCTOR INFORMATION:
+Doctor: Dr. ${appointment.doctorId?.name || 'N/A'}
+Speciality: ${appointment.doctorId?.specialities?.join(', ') || 'General'}
+
+APPOINTMENT DETAILS:
+Date: ${new Date(appointment.appointmentDate).toLocaleDateString()}
+Type: ${appointment.appointmentType}
+Description: ${billData.description}
+
+PAYMENT DETAILS:
+Amount: ₹${billData.amount}
+Payment Method: ${billData.paymentMethod.toUpperCase()}
+${billData.utrNumber ? `Transaction Ref: ${billData.utrNumber}` : ''}
+Status: ${billData.paymentMethod === 'cash' ? 'PAID' : 'PAID'}
+
+========================================
+Total Amount: ₹${billData.amount}
+Payment Status: PAID
+========================================
+
+Thank you for choosing our hospital!
+For any queries, please contact reception.
+
+Generated by: ${user.name}
+========================================
+    `;
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Hospital Bill - ${bill.billNumber}</title>
+          <style>
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 12px; 
+              line-height: 1.4;
+              margin: 20px;
+              white-space: pre-wrap;
+            }
+            @media print {
+              body { margin: 10px; }
+            }
+          </style>
+        </head>
+        <body>${billContent}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      printWindow.print();
+      printWindow.close();
+    };
+  };
+
+  const getPatientTypeIcon = (type) => {
+    return type === 'emergency' ? Activity : Calendar;
+  };
+
+  const getPatientTypeColor = (type) => {
+    return type === 'emergency' ? 'danger' : 'info';
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return 'success';
+      case 'pending': return 'warning';
+      case 'cancelled': return 'danger';
+      default: return 'gray';
+    }
+  };
+
+  const filteredPatients = patients.filter(patient =>
+    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.phone.includes(searchTerm) ||
+    patient.aadharNumber.includes(searchTerm) ||
+    patient.opdNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.emergencyNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredBills = bills.filter(bill =>
+    bill.patient?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.billNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    bill.patient?.phone?.includes(searchTerm)
+  );
+
+  if (showCreateForm) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">
+              {editingPatient ? 'Edit Patient' : 'Register New Patient'}
+            </h2>
+            <p className="card-description">
+              {editingPatient ? 'Update patient information' : 'Add a new patient to the hospital'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handlePatientSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label">Full Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={patientFormData.name}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Age *</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={patientFormData.age}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, age: e.target.value }))}
+                  className="form-input"
+                  required
+                  min="0"
+                  max="150"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Phone Number *</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={patientFormData.phone}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="form-input"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label">WhatsApp Number</label>
+                <input
+                  type="tel"
+                  name="whatsappNumber"
+                  value={patientFormData.whatsappNumber}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, whatsappNumber: e.target.value }))}
+                  className="form-input"
+                  placeholder="Same as phone if not provided"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Aadhar Number *</label>
+                <input
+                  type="text"
+                  name="aadharNumber"
+                  value={patientFormData.aadharNumber}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, aadharNumber: e.target.value }))}
+                  className="form-input"
+                  required
+                  pattern="\d{12}"
+                  maxLength="12"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Ayushman Number</label>
+                <input
+                  type="text"
+                  name="ayushmanNumber"
+                  value={patientFormData.ayushmanNumber}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, ayushmanNumber: e.target.value }))}
+                  className="form-input"
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={patientFormData.email}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="form-input"
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Patient Type *</label>
+                <select
+                  name="patientType"
+                  value={patientFormData.patientType}
+                  onChange={(e) => setPatientFormData(prev => ({ ...prev, patientType: e.target.value }))}
+                  className="form-input"
+                  required
+                >
+                  <option value="opd">OPD</option>
+                  <option value="emergency">Emergency</option>
+                </select>
+              </div>
+
+                          </div>
+
+            <div>
+              <label className="form-label">Previous Illness History</label>
+              <textarea
+                name="previousIllnessHistory"
+                value={patientFormData.previousIllnessHistory}
+                onChange={(e) => setPatientFormData(prev => ({ ...prev, previousIllnessHistory: e.target.value }))}
+                rows="3"
+                className="form-input"
+                placeholder="Any previous medical conditions..."
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Current Issues *</label>
+              <textarea
+                name="currentIssues"
+                value={patientFormData.currentIssues}
+                onChange={(e) => setPatientFormData(prev => ({ ...prev, currentIssues: e.target.value }))}
+                rows="3"
+                className="form-input"
+                placeholder="Describe current health issues..."
+                required
+              />
+            </div>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setEditingPatient(null);
+                  setPatientFormData({
+                    name: '',
+                    age: '',
+                    phone: '',
+                    whatsappNumber: '',
+                    aadharNumber: '',
+                    ayushmanNumber: '',
+                    email: '',
+                    previousIllnessHistory: '',
+                    currentIssues: '',
+                    patientType: 'opd'
+                  });
+                }}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+              >
+                {editingPatient ? 'Update Patient' : 'Register Patient'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Appointment Booking Form
+  if (showAppointmentForm) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Book Appointment</h2>
+            <p className="card-description">
+              Schedule appointment for {selectedPatient?.name || 'selected patient'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleAppointmentSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label">Patient</label>
+                <input
+                  type="text"
+                  value={selectedPatient?.name || ''}
+                  readOnly
+                  className="form-input bg-gray-50"
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Doctor *</label>
+                <select
+                  name="doctorId"
+                  value={appointmentFormData.doctorId}
+                  onChange={handleAppointmentInputChange}
+                  className="form-input"
+                  required
+                >
+                  <option value="">Select Doctor</option>
+                  {doctors.map(doctor => (
+                    <option key={doctor._id} value={doctor._id}>
+                      Dr. {doctor.name} - {doctor.specialities?.join(', ') || 'General'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label">Appointment Date *</label>
+                <input
+                  type="date"
+                  name="appointmentDate"
+                  value={appointmentFormData.appointmentDate}
+                  onChange={handleAppointmentInputChange}
+                  className="form-input"
+                  min={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Consultation Fee (₹) *</label>
+                <input
+                  type="number"
+                  name="consultationFee"
+                  value={appointmentFormData.consultationFee}
+                  onChange={handleAppointmentInputChange}
+                  className="form-input bg-gray-50"
+                  min="0"
+                  readOnly
+                  placeholder="Auto-calculated based on doctor and appointment type"
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  Fee automatically calculated based on doctor's rates
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label">Appointment Type</label>
+                <select
+                  name="appointmentType"
+                  value={appointmentFormData.appointmentType}
+                  onChange={handleAppointmentInputChange}
+                  className="form-input"
+                >
+                  <option value="consultation">Consultation</option>
+                  <option value="follow_up">Follow-up</option>
+                  <option value="emergency">Emergency</option>
+                  <option value="surgery">Surgery</option>
+                  <option value="test">Test</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Symptoms / Reason for Visit *</label>
+              <textarea
+                name="symptoms"
+                value={appointmentFormData.symptoms}
+                onChange={handleAppointmentInputChange}
+                rows="3"
+                className="form-input"
+                placeholder="Describe symptoms or reason for appointment..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Notes (Optional)</label>
+              <textarea
+                name="notes"
+                value={appointmentFormData.notes}
+                onChange={handleAppointmentInputChange}
+                rows="2"
+                className="form-input"
+                placeholder="Additional notes..."
+              />
+            </div>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAppointmentForm(false);
+                  setAppointmentFormData({
+                    patientId: '',
+                    doctorId: '',
+                    appointmentDate: new Date().toISOString().split('T')[0],
+                    symptoms: '',
+                    consultationFee: 500,
+                    appointmentType: 'consultation',
+                    notes: ''
+                  });
+                  setSelectedPatient(null);
+                }}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+              >
+                Book Appointment
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (showAppointmentPayment && selectedAppointment) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Process Appointment Payment</h2>
+            <p className="card-description">
+              Create bill and process payment for {selectedAppointment.patientId?.name}
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          {/* Appointment Summary */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm text-gray-500">Patient</div>
+                <div className="font-medium">{selectedAppointment.patientId?.name}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Doctor</div>
+                <div className="font-medium">Dr. {selectedAppointment.doctorId?.name}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Date</div>
+                <div className="font-medium">{new Date(selectedAppointment.appointmentDate).toLocaleDateString()}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Type</div>
+                <div className="font-medium">{selectedAppointment.appointmentType}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <h3 className="font-medium text-yellow-800 mb-2">Payment Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Amount:</span>
+                  <span className="font-medium">₹{appointmentBillData.amount}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Payment Method:</span>
+                  <span className="font-medium capitalize">{appointmentBillData.paymentMethod}</span>
+                </div>
+                {appointmentBillData.utrNumber && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Transaction Ref:</span>
+                    <span className="font-medium">{appointmentBillData.utrNumber}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Description:</span>
+                  <span className="font-medium">{appointmentBillData.description}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-medium text-blue-800 mb-2">Ready to Process</h3>
+              <p className="text-sm text-blue-600">
+                Click "Generate Bill" to create the bill and automatically print it. 
+                The payment will be recorded and the bill will be marked as paid.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => {
+                  setShowAppointmentPayment(false);
+                  setSelectedAppointment(null);
+                  setAppointmentBillData({
+                    amount: '',
+                    description: '',
+                    paymentMethod: 'cash',
+                    utrNumber: ''
+                  });
+                }}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAppointmentBillSubmit}
+                className="btn-primary"
+              >
+                Generate Bill & Print
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showBillingForm && selectedPatient) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Patient Billing</h2>
+            <p className="card-description">
+              Manage bills and payments for {selectedPatient.name}
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          {/* Patient Summary */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm text-gray-500">Patient ID</div>
+                <div className="font-medium">{selectedPatient.opdNumber || selectedPatient.emergencyNumber}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Total Amount</div>
+                <div className="font-medium">₹{selectedPatient.totalAmount}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Paid Amount</div>
+                <div className="font-medium text-green-600">₹{selectedPatient.totalPaid}</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-500">Balance</div>
+                <div className="font-medium text-red-600">₹{selectedPatient.balanceAmount}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Create New Bill */}
+          <div className="mb-8">
+            <h3 className="text-lg font-medium mb-4">Create New Bill</h3>
+            <form onSubmit={handleBillingSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Amount *</label>
+                  <input
+                    type="number"
+                    name="amount"
+                    value={billingFormData.amount}
+                    onChange={(e) => setBillingFormData(prev => ({ ...prev, amount: e.target.value }))}
+                    className="form-input"
+                    required
+                    step="0.01"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Payment Method</label>
+                  <select
+                    name="paymentMethod"
+                    value={billingFormData.paymentMethod}
+                    onChange={(e) => setBillingFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                    className="form-input"
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="upi">UPI</option>
+                    <option value="card">Card</option>
+                    <option value="online">Online</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Description *</label>
+                <input
+                  type="text"
+                  name="description"
+                  value={billingFormData.description}
+                  onChange={(e) => setBillingFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="form-input"
+                  required
+                  placeholder="Consultation fee, lab tests, etc."
+                />
+              </div>
+              <button type="submit" className="btn-primary">
+                Create Bill
+              </button>
+            </form>
+          </div>
+
+          {/* Existing Bills */}
+          <div>
+            <h3 className="text-lg font-medium mb-4">Existing Bills</h3>
+            <div className="space-y-4">
+              {selectedPatient.bills?.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No bills found for this patient.
+                </div>
+              ) : (
+                selectedPatient.bills.map((bill) => (
+                  <div key={bill._id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="font-medium">{bill.billNumber}</div>
+                        <div className="text-sm text-gray-500">{bill.description}</div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(bill.billDate).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium">₹{bill.amount}</div>
+                        <span className={`badge badge-${getPaymentStatusColor(bill.status)}`}>
+                          {bill.status}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {bill.status === 'pending' && (
+                      <div className="mt-4 border-t pt-4">
+                        <h4 className="text-sm font-medium mb-2">Process Payment</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="form-label">UTR Number *</label>
+                            <input
+                              type="text"
+                              value={paymentFormData.utrNumber}
+                              onChange={(e) => setPaymentFormData(prev => ({ ...prev, utrNumber: e.target.value }))}
+                              className="form-input"
+                              placeholder="Transaction reference"
+                            />
+                          </div>
+                          <div>
+                            <label className="form-label">Payment Method</label>
+                            <select
+                              value={paymentFormData.paymentMethod}
+                              onChange={(e) => setPaymentFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                              className="form-input"
+                            >
+                              <option value="cash">Cash</option>
+                              <option value="upi">UPI</option>
+                              <option value="card">Card</option>
+                              <option value="online">Online</option>
+                            </select>
+                          </div>
+                          <div className="flex items-end">
+                            <button
+                              onClick={() => handlePaymentSubmit(bill._id)}
+                              className="btn-success"
+                            >
+                              Mark as Paid
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {bill.status === 'paid' && bill.paymentDetails && (
+                      <div className="mt-2 text-sm text-gray-500">
+                        Paid via {bill.paymentDetails.paymentMethod} - 
+                        UTR: {bill.paymentDetails.utrNumber}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-4 mt-6">
+            <button
+              onClick={() => {
+                setShowBillingForm(false);
+                setSelectedPatient(null);
+                setBillingFormData({
+                  amount: '',
+                  description: '',
+                  paymentMethod: 'cash'
+                });
+                setPaymentFormData({
+                  utrNumber: '',
+                  paymentMethod: 'cash'
+                });
+              }}
+              className="btn-secondary"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Reception Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage patient registration and billing</p>
+          </div>
+          {activeTab === 'patients' && (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="btn-primary flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Register Patient
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="alert alert-danger flex items-center mb-6">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          {error}
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('patients')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'patients'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Users className="inline h-4 w-4 mr-2" />
+            Patients ({patients.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('appointments')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'appointments'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Calendar className="inline h-4 w-4 mr-2" />
+            Appointments ({appointments.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('billing')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'billing'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <CreditCard className="inline h-4 w-4 mr-2" />
+            Billing ({bills.length})
+          </button>
+        </nav>
+      </div>
+
+      {/* Search Bar and Date Filter */}
+      <div className="mb-6 flex items-center space-x-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder={`Search ${activeTab === 'patients' ? 'patients' : activeTab === 'appointments' ? 'appointments' : 'bills'}...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="form-input pl-10 w-64"
+          />
+        </div>
+        
+        {activeTab === 'appointments' && (
+          <div className="flex items-center space-x-2">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="form-input"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Data Table */}
+      <div className="card">
+        <div className="table-container">
+          <table className="table">
+            <thead className="table-header">
+              <tr>
+                {activeTab === 'patients' ? (
+                  <>
+                    <th className="table-header-cell">Patient</th>
+                    <th className="table-header-cell">Type</th>
+                    <th className="table-header-cell">Contact</th>
+                    <th className="table-header-cell">Status</th>
+                    <th className="table-header-cell">Actions</th>
+                  </>
+                ) : activeTab === 'appointments' ? (
+                  <>
+                    <th className="table-header-cell">Queue #</th>
+                    <th className="table-header-cell">Patient</th>
+                    <th className="table-header-cell">Doctor</th>
+                    <th className="table-header-cell">Date & Time</th>
+                    <th className="table-header-cell">Type</th>
+                    <th className="table-header-cell">Status</th>
+                    <th className="table-header-cell">Payment</th>
+                    <th className="table-header-cell">Actions</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="table-header-cell">Bill</th>
+                    <th className="table-header-cell">Patient</th>
+                    <th className="table-header-cell">Amount</th>
+                    <th className="table-header-cell">Date</th>
+                    <th className="table-header-cell">Status</th>
+                    <th className="table-header-cell">Actions</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="table-body">
+              {loading ? (
+                <tr>
+                  <td colSpan="8" className="table-body-cell text-center py-8">
+                    <div className="spinner mx-auto"></div>
+                  </td>
+                </tr>
+              ) : (activeTab === 'patients' ? filteredPatients : activeTab === 'appointments' ? appointments : filteredBills).length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="table-body-cell text-center py-8">
+                    <div className="text-gray-500">
+                      {searchTerm ? `No ${activeTab} found matching your search.` : `No ${activeTab} found.`}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                (activeTab === 'patients' ? filteredPatients : activeTab === 'appointments' ? appointments : filteredBills).map((item) => (
+                  <tr key={item._id}>
+                    {activeTab === 'patients' ? (
+                      <>
+                        <td className="table-body-cell">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                              {React.createElement(getPatientTypeIcon(item.patientType), { className: 'h-5 w-5 text-primary-600' })}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{item.name}</div>
+                              <div className="text-sm text-gray-500">
+                                {item.opdNumber || item.emergencyNumber}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Age: {item.age} | Aadhar: {item.aadharNumber}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <span className={`badge badge-${getPatientTypeColor(item.patientType)}`}>
+                            {item.patientType.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center text-sm text-gray-500">
+                            <Phone className="h-4 w-4 mr-1" />
+                            {item.phone}
+                          </div>
+                          {item.email && (
+                            <div className="flex items-center text-sm text-gray-500 mt-1">
+                              <Mail className="h-4 w-4 mr-1" />
+                              {item.email}
+                            </div>
+                          )}
+                        </td>
+                        <td className="table-body-cell">
+                          <span className={`badge badge-${item.status === 'registered' ? 'info' : item.status === 'in_consultation' ? 'warning' : item.status === 'treatment_complete' ? 'success' : 'gray'}`}>
+                            {item.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleBookAppointment(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Book Appointment"
+                            >
+                              <Calendar className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleEdit(item)}
+                              className="text-primary-600 hover:text-primary-900"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleViewBilling(item)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Billing"
+                            >
+                              <CreditCard className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : activeTab === 'appointments' ? (
+                      <>
+                        <td className="table-body-cell">
+                          <div className="flex items-center justify-center">
+                            <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                              <span className="text-purple-600 font-bold text-sm">
+                                {item.queueNumber || '-'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                              <User className="h-4 w-4 text-primary-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{item.patientId?.name || 'N/A'}</div>
+                              <div className="text-sm text-gray-500">{item.patientId?.phone || 'N/A'}</div>
+                              <div className="text-sm text-gray-500">
+                                Age: {item.patientId?.age || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center mr-2">
+                              <Stethoscope className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">Dr. {item.doctorId?.name || 'N/A'}</div>
+                              <div className="text-sm text-gray-500">
+                                {item.doctorId?.specialities?.join(', ') || 'General'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="text-sm">
+                            <div className="font-medium text-gray-900">
+                              {new Date(item.appointmentDate).toLocaleDateString()}
+                            </div>
+                            <div className="text-gray-500">
+                              {new Date(item.appointmentDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <span className={`badge badge-${item.appointmentType === 'consultation' ? 'info' : item.appointmentType === 'emergency' ? 'danger' : item.appointmentType === 'surgery' ? 'warning' : 'gray'}`}>
+                            {item.appointmentType?.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="table-body-cell">
+                          <span className={`badge badge-${item.status === 'scheduled' ? 'info' : item.status === 'in_progress' ? 'warning' : item.status === 'completed' ? 'success' : item.status === 'cancelled' ? 'danger' : 'gray'}`}>
+                            {item.status?.replace('_', ' ').toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="table-body-cell">
+                          {item.paymentStatus === 'paid' ? (
+                            <div className="flex items-center">
+                              <span className="badge badge-success">PAID</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                {item.paymentMethod?.toUpperCase()}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center">
+                              <span className="badge badge-warning">PENDING</span>
+                              <span className="ml-2 text-xs text-gray-500">
+                                ₹{item.consultationFee || 500}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleViewDetails(item)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="View Details"
+                            >
+                              <Calendar className="h-4 w-4" />
+                            </button>
+                            {item.paymentStatus !== 'paid' && (
+                              <button
+                                onClick={() => handleAppointmentPayment(item)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Process Payment"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </button>
+                            )}
+                            {item.status === 'scheduled' && (
+                              <button
+                                className="text-purple-600 hover:text-purple-900"
+                                title="Start Consultation"
+                              >
+                                <Activity className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="table-body-cell">
+                          <div>
+                            <div className="font-medium text-gray-900">{item.billNumber}</div>
+                            <div className="text-sm text-gray-500">{item.description}</div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center">
+                            <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center mr-2">
+                              <User className="h-4 w-4 text-primary-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">{item.patient?.name}</div>
+                              <div className="text-sm text-gray-500">{item.patient?.phone}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="font-medium">₹{item.amount}</div>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="text-sm text-gray-500">
+                            {new Date(item.billDate).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="table-body-cell">
+                          <span className={`badge badge-${getPaymentStatusColor(item.status)}`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="table-body-cell">
+                          <div className="flex items-center space-x-2">
+                            {item.status === 'pending' && (
+                              <button
+                                onClick={() => handleViewBilling(item.patient)}
+                                className="text-green-600 hover:text-green-900"
+                                title="Process Payment"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ReceptionistDashboard;

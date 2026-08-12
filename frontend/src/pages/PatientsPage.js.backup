@@ -1,0 +1,556 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Calendar, Activity, CreditCard, User, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+const PatientsPage = () => {
+  const navigate = useNavigate();
+  const { api, user } = useAuth();
+  
+  // State
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showPatientForm, setShowPatientForm] = useState(false);
+  const [showBillingForm, setShowBillingForm] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState(null);
+  
+  // Form states
+  const [patientFormData, setPatientFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    age: '',
+    gender: 'male',
+    aadharNumber: '',
+    address: '',
+    patientType: 'opd',
+    assignedDoctorId: '',
+    symptoms: ''
+  });
+  
+  const [billingFormData, setBillingFormData] = useState({
+    amount: '',
+    description: '',
+    paymentMethod: 'cash'
+  });
+
+  // Fetch patients
+  const fetchPatients = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get(`/patients/hospital/${user.hospitalId}`);
+      setPatients(response.data.patients);
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to fetch patients');
+    } finally {
+      setLoading(false);
+    }
+  }, [api, user?.hospitalId]);
+
+  
+  useEffect(() => {
+    if (user?.hospitalId) {
+      fetchPatients();
+    }
+  }, [fetchPatients, user?.hospitalId]);
+
+  // Filter patients
+  const filteredPatients = patients.filter(patient =>
+    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.phone.includes(searchTerm) ||
+    patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    patient.opdNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Handlers
+  const handlePatientInputChange = (e) => {
+    const { name, value } = e.target;
+    setPatientFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleBillingInputChange = (e) => {
+    const { name, value } = e.target;
+    setBillingFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePatientSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      await api.post('/patients', {
+        ...patientFormData,
+        hospitalId: user.hospitalId,
+        createdBy: user.id
+      });
+
+      setPatientFormData({
+        name: '',
+        phone: '',
+        email: '',
+        age: '',
+        gender: 'male',
+        aadharNumber: '',
+        address: '',
+        patientType: 'opd',
+        assignedDoctorId: '',
+        symptoms: ''
+      });
+      setShowPatientForm(false);
+      fetchPatients();
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to create patient');
+    }
+  };
+
+  const handleBillingSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    try {
+      await api.post(`/billing/patient/${selectedPatient._id}`, billingFormData);
+      
+      setBillingFormData({
+        amount: '',
+        description: '',
+        paymentMethod: 'cash'
+      });
+      setShowBillingForm(false);
+      setSelectedPatient(null);
+      fetchPatients();
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to create bill');
+    }
+  };
+
+  const handleViewBilling = (patient) => {
+    setSelectedPatient(patient);
+    setShowBillingForm(true);
+  };
+
+  const getPatientTypeIcon = (type) => {
+    return type === 'emergency' ? Activity : Calendar;
+  };
+
+  const getPatientTypeColor = (type) => {
+    return type === 'emergency' ? 'danger' : 'info';
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid': return 'success';
+      case 'pending': return 'warning';
+      case 'overdue': return 'danger';
+      default: return 'gray';
+    }
+  };
+
+  // Patient form component
+  if (showPatientForm) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Register New Patient</h2>
+            <p className="card-description">
+              Add a new patient to the hospital system
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handlePatientSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label">Full Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={patientFormData.name}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Phone Number *</label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={patientFormData.phone}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div>
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={patientFormData.email}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Age *</label>
+                <input
+                  type="number"
+                  name="age"
+                  value={patientFormData.age}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                  required
+                  min="0"
+                  max="150"
+                />
+              </div>
+              <div>
+                <label className="form-label">Gender *</label>
+                <select
+                  name="gender"
+                  value={patientFormData.gender}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                  required
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Patient Type *</label>
+                <select
+                  name="patientType"
+                  value={patientFormData.patientType}
+                  onChange={handlePatientInputChange}
+                  className="form-input"
+                  required
+                >
+                  <option value="opd">OPD</option>
+                  <option value="emergency">Emergency</option>
+                  <option value="ipd">IPD</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">Aadhar Number</label>
+              <input
+                type="text"
+                name="aadharNumber"
+                value={patientFormData.aadharNumber}
+                onChange={handlePatientInputChange}
+                className="form-input"
+                placeholder="12-digit Aadhar number"
+              />
+            </div>
+            <div>
+              <label className="form-label">Address</label>
+              <textarea
+                name="address"
+                value={patientFormData.address}
+                onChange={handlePatientInputChange}
+                className="form-input"
+                rows="3"
+              />
+            </div>
+            <div>
+              <label className="form-label">Symptoms / Reason for Visit *</label>
+              <textarea
+                name="symptoms"
+                value={patientFormData.symptoms}
+                onChange={handlePatientInputChange}
+                className="form-input"
+                rows="3"
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => setShowPatientForm(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+              >
+                Register Patient
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Billing form component
+  if (showBillingForm && selectedPatient) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Patient Billing</h2>
+            <p className="card-description">
+              Manage bills and payments for {selectedPatient.name}
+            </p>
+          </div>
+
+          {error && (
+            <div className="alert alert-danger flex items-center mb-4">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {error}
+            </div>
+          )}
+
+          <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <h3 className="font-medium text-gray-900 mb-2">Patient Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-500">Name:</span>
+                <span className="ml-2 font-medium">{selectedPatient.name}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Phone:</span>
+                <span className="ml-2 font-medium">{selectedPatient.phone}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Patient Type:</span>
+                <span className="ml-2 font-medium capitalize">{selectedPatient.patientType}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Total Amount:</span>
+                <span className="ml-2 font-medium">₹{selectedPatient.totalAmount || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleBillingSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label">Amount *</label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={billingFormData.amount}
+                  onChange={handleBillingInputChange}
+                  className="form-input"
+                  required
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div>
+                <label className="form-label">Payment Method</label>
+                <select
+                  name="paymentMethod"
+                  value={billingFormData.paymentMethod}
+                  onChange={handleBillingInputChange}
+                  className="form-input"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="card">Card</option>
+                  <option value="online">Online</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">Description *</label>
+              <input
+                type="text"
+                name="description"
+                value={billingFormData.description}
+                onChange={handleBillingInputChange}
+                className="form-input"
+                required
+                placeholder="Consultation fee, lab tests, etc."
+              />
+            </div>
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={() => setShowBillingForm(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+              >
+                Create Bill
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
+          <p className="text-gray-600 mt-2">Manage patient records and information</p>
+        </div>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => navigate('/receptionist/dashboard')}
+            className="btn-secondary"
+          >
+            Back to Dashboard
+          </button>
+          <button
+            onClick={() => setShowPatientForm(true)}
+            className="btn-primary flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Patient
+          </button>
+        </div>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="card mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between p-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search patients by name, phone, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-input pl-10 w-full"
+            />
+          </div>
+          <div className="mt-4 md:mt-0 text-sm text-gray-500">
+            {filteredPatients.length} of {patients.length} patients
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="alert alert-danger flex items-center mb-6">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          {error}
+        </div>
+      )}
+
+      {/* Patients Table */}
+      <div className="card">
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="table-header-cell">Patient</th>
+                <th className="table-header-cell">Type</th>
+                <th className="table-header-cell">Contact</th>
+                <th className="table-header-cell">Status</th>
+                <th className="table-header-cell">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="table-body">
+              {loading ? (
+                <tr>
+                  <td colSpan="5" className="table-body-cell text-center py-8">
+                    <div className="spinner mx-auto"></div>
+                  </td>
+                </tr>
+              ) : filteredPatients.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="table-body-cell text-center py-8">
+                    <div className="text-gray-500">
+                      {searchTerm ? 'No patients found matching your search.' : 'No patients found.'}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredPatients.map((patient) => (
+                  <tr key={patient._id}>
+                    <td className="table-body-cell">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                          <User className="h-5 w-5 text-primary-600" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900">{patient.name}</div>
+                          <div className="text-sm text-gray-500">
+                            {patient.opdNumber || patient.emergencyNumber}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="table-body-cell">
+                      <div className="flex items-center">
+                        <span className="mr-2">
+                          {getPatientTypeIcon(patient.patientType)}
+                        </span>
+                        <span className={`badge badge-${getPatientTypeColor(patient.patientType)}`}>
+                          {patient.patientType.toUpperCase()}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="table-body-cell">
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-900">{patient.phone}</div>
+                        <div className="text-gray-500">{patient.email || 'N/A'}</div>
+                      </div>
+                    </td>
+                    <td className="table-body-cell">
+                      <div className="text-sm">
+                        <div className="flex items-center">
+                          <span className={`badge badge-${getPaymentStatusColor(patient.balanceAmount > 0 ? 'pending' : 'paid')}`}>
+                            {patient.balanceAmount > 0 ? 'PENDING' : 'PAID'}
+                          </span>
+                        </div>
+                        <div className="text-gray-500 mt-1">
+                          Balance: ₹{patient.balanceAmount || 0}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="table-body-cell">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => navigate(`/receptionist/appointments?patient=${patient._id}`)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Appointments"
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewBilling(patient)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Billing"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PatientsPage;

@@ -2,6 +2,7 @@
 .env.local
 *.env
 .wnv
+
 node_modules/
 build/
 dist/

@@ -592,4 +592,45 @@ router.get('/:id/bill-pdf', authenticate, async (req, res) => {
   }
 });
 
+// Generate prescription PDF for appointment
+router.get('/:id/prescription-pdf', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const appointment = await Appointment.findById(id)
+      .populate('patientId')
+      .populate('doctorId')
+      .populate('hospitalId');
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+
+    // Check hospital access
+    if (req.user.role !== 'super_admin') {
+      const userHospitalId = req.user.hospitalId._id ? req.user.hospitalId._id.toString() : req.user.hospitalId.toString();
+      const appointmentHospitalId = appointment.hospitalId._id ? appointment.hospitalId._id.toString() : appointment.hospitalId.toString();
+
+      if (!req.user.hospitalId || userHospitalId !== appointmentHospitalId) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    const { generateAppointmentPrescriptionPDF } = require('../utils/generateAppointmentPrescriptionPDF');
+    const pdfBuffer = await generateAppointmentPrescriptionPDF(
+      appointment,
+      appointment.hospitalId,
+      appointment.patientId,
+      appointment.doctorId
+    );
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=prescription-${id}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Generate prescription PDF error:', error);
+    res.status(500).json({ message: 'Server error generating prescription PDF' });
+  }
+});
+
 module.exports = router;

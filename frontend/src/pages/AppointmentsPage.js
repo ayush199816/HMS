@@ -420,6 +420,33 @@ const AppointmentsPage = () => {
     }
   };
 
+  const handleDownloadPrescription = async (appointment) => {
+    try {
+      const token = localStorage.getItem('token');
+      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/prescription-pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prescription-${appointment._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Frontend: Error downloading prescription PDF:', error);
+      alert(`Failed to download prescription: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   // Appointment form component
   if (showAppointmentForm) {
     return (
@@ -717,6 +744,12 @@ const AppointmentsPage = () => {
                 className="btn-secondary"
               >
                 Cancel
+              </button>
+              <button
+                onClick={() => handleDownloadPrescription(selectedAppointment)}
+                className="btn-secondary"
+              >
+                Download Prescription
               </button>
               <button
                 onClick={handleAppointmentBillSubmit}

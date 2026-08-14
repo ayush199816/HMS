@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Plus, Calendar, DollarSign, User, AlertCircle, Download } from 'lucide-react';
+import { Search, Plus, Calendar, DollarSign, User, AlertCircle, Download, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateIST, formatTimeIST, toISTDateTimeLocal, appendISTOffset } from '../utils/dateUtils';
 import axios from 'axios';
@@ -340,7 +340,7 @@ const AppointmentsPage = () => {
       const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       
       // Call the new PDF endpoint with direct axios to handle blob properly
-      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/bill-pdf`, {
+      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/bill-pdf?t=${Date.now()}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -354,7 +354,9 @@ const AppointmentsPage = () => {
       // Create download link and trigger download
       const a = document.createElement('a');
       a.href = url;
-      a.download = `appointment-bill-${appointment._id}.pdf`;
+      const disposition = response.headers['content-disposition'];
+      const filenameMatch = disposition && disposition.match(/filename="?([^";]+)"?/);
+      a.download = filenameMatch ? filenameMatch[1] : `appointment-bill-${appointment._id}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -378,7 +380,7 @@ const AppointmentsPage = () => {
       const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       
       // Call the PDF endpoint with direct axios to handle blob properly
-      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/bill-pdf`, {
+      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/bill-pdf?t=${Date.now()}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -400,7 +402,9 @@ const AppointmentsPage = () => {
         // Fallback: download if popup is blocked
         const a = document.createElement('a');
         a.href = url;
-        a.download = `appointment-bill-${appointment._id}.pdf`;
+        const disposition = response.headers['content-disposition'];
+        const filenameMatch = disposition && disposition.match(/filename="?([^";]+)"?/);
+        a.download = filenameMatch ? filenameMatch[1] : `appointment-bill-${appointment._id}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -425,7 +429,7 @@ const AppointmentsPage = () => {
       const token = localStorage.getItem('token');
       const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/prescription-pdf`, {
+      const response = await axios.get(`${baseURL}/appointments/${appointment._id}/prescription-pdf?t=${Date.now()}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -436,7 +440,9 @@ const AppointmentsPage = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `prescription-${appointment._id}.pdf`;
+      const disposition = response.headers['content-disposition'];
+      const filenameMatch = disposition && disposition.match(/filename="?([^";]+)"?/);
+      a.download = filenameMatch ? filenameMatch[1] : `prescription-${appointment._id}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -915,7 +921,7 @@ const AppointmentsPage = () => {
                       )}
                     </td>
                     <td className="table-body-cell">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-center gap-2">
                         {appointment.paymentStatus !== 'paid' && (
                           <button
                             onClick={() => handleAppointmentPayment(appointment)}
@@ -926,13 +932,22 @@ const AppointmentsPage = () => {
                           </button>
                         )}
                         {appointment.paymentStatus === 'paid' && (
-                          <button
-                            onClick={() => handleDownloadBill(appointment)}
-                            className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                            title="Download Bill"
-                          >
-                            <Download className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleDownloadBill(appointment)}
+                              className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                              title="Download Bill"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadPrescription(appointment)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Download Prescription"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>

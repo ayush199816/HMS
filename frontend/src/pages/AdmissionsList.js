@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateIST } from '../utils/dateUtils';
-import { ArrowLeft, Bed, User, Calendar, Search, Plus, X } from 'lucide-react';
+import { ArrowLeft, Bed, User, Calendar, Search, Plus, X, FileText } from 'lucide-react';
 
 const AdmissionsList = () => {
   const navigate = useNavigate();
@@ -21,6 +21,26 @@ const AdmissionsList = () => {
   const [dischargeDate, setDischargeDate] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  const [summaryModalOpen, setSummaryModalOpen] = useState(false);
+  const [summaryEditMode, setSummaryEditMode] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const [summaryData, setSummaryData] = useState({
+    problemStatements: [],
+    testsAndFindings: [],
+    procedures: [],
+    medications: [],
+    followUpDates: [],
+    conclusion: ''
+  });
+  const [summaryInput, setSummaryInput] = useState({
+    problemStatements: '',
+    testsAndFindings: '',
+    procedures: '',
+    followUpDates: ''
+  });
+  const [medicineInput, setMedicineInput] = useState({ name: '', duration: '', howToTake: '' });
 
   const canManage = ['receptionist', 'hospital_admin', 'accounts', 'super_admin'].includes(user?.role);
 
@@ -135,6 +155,136 @@ const AdmissionsList = () => {
       setActionError(error.response?.data?.message || 'Failed to discharge patient');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const openSummaryModal = (admission) => {
+    setSelectedAdmission(admission);
+    setSummaryData({
+      problemStatements: admission.dischargeSummary?.problemStatements || [],
+      testsAndFindings: admission.dischargeSummary?.testsAndFindings || [],
+      procedures: admission.dischargeSummary?.procedures || [],
+      medications: admission.dischargeSummary?.medications || [],
+      followUpDates: admission.dischargeSummary?.followUpDates || [],
+      conclusion: admission.dischargeSummary?.conclusion || ''
+    });
+    setSummaryInput({
+      problemStatements: '',
+      testsAndFindings: '',
+      procedures: '',
+      followUpDates: ''
+    });
+    setMedicineInput({ name: '', duration: '', howToTake: '' });
+    setSummaryError('');
+    setSummaryEditMode(!admission.dischargeSummary?.generatedAt);
+    setSummaryModalOpen(true);
+  };
+
+  const closeSummaryModal = () => {
+    setSummaryModalOpen(false);
+    setSelectedAdmission(null);
+    setSummaryError('');
+    setSummaryEditMode(false);
+  };
+
+  const addSummaryItem = (section) => {
+    const value = summaryInput[section].trim();
+    if (!value) return;
+    setSummaryData(prev => ({ ...prev, [section]: [...prev[section], value] }));
+    setSummaryInput(prev => ({ ...prev, [section]: '' }));
+  };
+
+  const removeSummaryItem = (section, index) => {
+    setSummaryData(prev => ({
+      ...prev,
+      [section]: prev[section].filter((_, i) => i !== index)
+    }));
+  };
+
+  const addMedication = () => {
+    const name = medicineInput.name.trim();
+    if (!name) return;
+    const newMed = {
+      name,
+      duration: medicineInput.duration.trim(),
+      howToTake: medicineInput.howToTake.trim()
+    };
+    setSummaryData(prev => ({ ...prev, medications: [...prev.medications, newMed] }));
+    setMedicineInput({ name: '', duration: '', howToTake: '' });
+  };
+
+  const removeMedication = (index) => {
+    setSummaryData(prev => ({ ...prev, medications: prev.medications.filter((_, i) => i !== index) }));
+  };
+
+  const handleSaveSummary = async () => {
+    if (!selectedAdmission) return;
+    try {
+      setSummaryLoading(true);
+      setSummaryError('');
+      await api.put(`/admissions/${selectedAdmission._id}/discharge-summary`, summaryData);
+      alert('Discharge summary saved successfully');
+      closeSummaryModal();
+      fetchAdmissions();
+    } catch (error) {
+      setSummaryError(error.response?.data?.message || 'Failed to save discharge summary');
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const handleGenerateSummaryPDF = async () => {
+    if (!selectedAdmission) return;
+    try {
+      setSummaryLoading(true);
+      setSummaryError('');
+      await api.put(`/admissions/${selectedAdmission._id}/discharge-summary?t=${Date.now()}`, summaryData);
+      const response = await api.get(`/admissions/${selectedAdmission._id}/discharge-summary-pdf?t=${Date.now()}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = response.headers['content-disposition'];
+      const filenameMatch = disposition && disposition.match(/filename="?([^";]+)"?/);
+      a.download = filenameMatch ? filenameMatch[1] : `discharge-summary-${selectedAdmission._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      closeSummaryModal();
+      fetchAdmissions();
+    } catch (error) {
+      setSummaryError(error.response?.data?.message || error.message || 'Failed to generate discharge summary PDF');
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
+  const handleDownloadSummaryPDF = async () => {
+    if (!selectedAdmission) return;
+    try {
+      setSummaryLoading(true);
+      setSummaryError('');
+      const response = await api.get(`/admissions/${selectedAdmission._id}/discharge-summary-pdf?t=${Date.now()}`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const disposition = response.headers['content-disposition'];
+      const filenameMatch = disposition && disposition.match(/filename="?([^";]+)"?/);
+      a.download = filenameMatch ? filenameMatch[1] : `discharge-summary-${selectedAdmission._id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      setSummaryError(error.response?.data?.message || error.message || 'Failed to download discharge summary PDF');
+    } finally {
+      setSummaryLoading(false);
     }
   };
 
@@ -276,7 +426,7 @@ const AdmissionsList = () => {
                   {canManage && (
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">
-                        {admission.status !== 'discharged' && (
+                        {admission.status !== 'discharged' ? (
                           <>
                             <button
                               onClick={() => openModal(admission, 'bed')}
@@ -291,6 +441,14 @@ const AdmissionsList = () => {
                               Discharge
                             </button>
                           </>
+                        ) : (
+                          <button
+                            onClick={() => openSummaryModal(admission)}
+                            className="btn btn-primary text-xs flex items-center"
+                          >
+                            <FileText className="h-3 w-3 mr-1" />
+                            Discharge Summary
+                          </button>
                         )}
                       </div>
                     </td>
@@ -374,6 +532,292 @@ const AdmissionsList = () => {
                 {actionLoading ? 'Saving...' : modalType === 'bed' ? 'Change Bed' : 'Discharge'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {summaryModalOpen && selectedAdmission && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="card" style={{ width: '100%', maxWidth: '600px', margin: '0 1rem', padding: '1.5rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Discharge Summary</h2>
+              <button onClick={closeSummaryModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Patient: <span className="font-medium">{selectedAdmission.patientId?.name}</span>
+              {selectedAdmission.dischargeSummary?.createdBy?.name && (
+                <span className="ml-2 text-xs text-gray-500">
+                  (Prepared by: {selectedAdmission.dischargeSummary.createdBy.name})
+                </span>
+              )}
+              {selectedAdmission.dischargeSummary?.generatedAt && (
+                <span className="ml-2 text-xs text-gray-500">
+                  on {formatDateIST(selectedAdmission.dischargeSummary.generatedAt)}
+                </span>
+              )}
+            </p>
+
+            {summaryError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+                {summaryError}
+              </div>
+            )}
+
+            {summaryEditMode ? (
+              <>
+                {[
+                  { key: 'problemStatements', label: 'Problem Statements' },
+                  { key: 'testsAndFindings', label: 'Tests Done and Findings' },
+                  { key: 'procedures', label: 'Procedure Post Admission' }
+                ].map(({ key, label }) => (
+                  <div key={key} className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                    <textarea
+                      rows={3}
+                      value={summaryInput[key]}
+                      onChange={(e) => setSummaryInput(prev => ({ ...prev, [key]: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter a detailed paragraph and click Add"
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={() => addSummaryItem(key)}
+                        className="btn btn-secondary text-sm px-3"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {summaryData[key].length > 0 && (
+                      <ul className="space-y-2 mt-2">
+                        {summaryData[key].map((item, index) => (
+                          <li key={index} className="flex items-start justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                            <span className="whitespace-pre-wrap">{item}</span>
+                            <button
+                              onClick={() => removeSummaryItem(key, index)}
+                              className="text-red-600 hover:text-red-800 text-xs ml-2"
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Medications to be Taken</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={medicineInput.name}
+                      onChange={(e) => setMedicineInput(prev => ({ ...prev, name: e.target.value }))}
+                      className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Medicine name"
+                    />
+                    <input
+                      type="text"
+                      value={medicineInput.duration}
+                      onChange={(e) => setMedicineInput(prev => ({ ...prev, duration: e.target.value }))}
+                      className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Duration"
+                    />
+                    <input
+                      type="text"
+                      value={medicineInput.howToTake}
+                      onChange={(e) => setMedicineInput(prev => ({ ...prev, howToTake: e.target.value }))}
+                      className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="How to take"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={addMedication}
+                      className="btn btn-secondary text-sm px-3"
+                    >
+                      Add Medicine
+                    </button>
+                  </div>
+                  {summaryData.medications.length > 0 && (
+                    <ul className="space-y-2 mt-2">
+                      {summaryData.medications.map((med, index) => (
+                        <li key={index} className="bg-gray-50 px-3 py-2 rounded-lg text-sm flex items-start justify-between">
+                          <div>
+                            <p className="font-medium">{med.name}</p>
+                            <p className="text-gray-600 text-xs">Duration: {med.duration || '-'}</p>
+                            <p className="text-gray-600 text-xs">How to take: {med.howToTake || '-'}</p>
+                          </div>
+                          <button
+                            onClick={() => removeMedication(index)}
+                            className="text-red-600 hover:text-red-800 text-xs ml-2"
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Next Follow Up Dates</label>
+                  <div className="flex space-x-2 mb-2">
+                    <input
+                      type="date"
+                      value={summaryInput.followUpDates}
+                      onChange={(e) => setSummaryInput(prev => ({ ...prev, followUpDates: e.target.value }))}
+                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <button
+                      onClick={() => addSummaryItem('followUpDates')}
+                      className="btn btn-secondary text-sm px-3"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {summaryData.followUpDates.length > 0 && (
+                    <ul className="space-y-1">
+                      {summaryData.followUpDates.map((item, index) => (
+                        <li key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                          <span>{item}</span>
+                          <button
+                            onClick={() => removeSummaryItem('followUpDates', index)}
+                            className="text-red-600 hover:text-red-800 text-xs"
+                          >
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Final Conclusion</label>
+                  <textarea
+                    rows={4}
+                    value={summaryData.conclusion}
+                    onChange={(e) => setSummaryData(prev => ({ ...prev, conclusion: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter final conclusion"
+                  />
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setSummaryEditMode(false)}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveSummary}
+                    disabled={summaryLoading}
+                    className="btn btn-primary"
+                  >
+                    {summaryLoading ? 'Saving...' : 'Save Summary'}
+                  </button>
+                  <button
+                    onClick={handleGenerateSummaryPDF}
+                    disabled={summaryLoading}
+                    className="btn btn-primary"
+                  >
+                    {summaryLoading ? 'Saving...' : 'Save & Generate PDF'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {[
+                  { key: 'problemStatements', label: 'Problem Statements' },
+                  { key: 'testsAndFindings', label: 'Tests Done and Findings' },
+                  { key: 'procedures', label: 'Procedure Post Admission' }
+                ].map(({ key, label }) => (
+                  <div key={key} className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+                    {summaryData[key].length > 0 ? (
+                      <ul className="space-y-2">
+                        {summaryData[key].map((item, index) => (
+                          <li key={index} className="bg-gray-50 px-3 py-2 rounded-lg text-sm whitespace-pre-wrap">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500 italic">No records</p>
+                    )}
+                  </div>
+                ))}
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Medications to be Taken</label>
+                  {summaryData.medications.length > 0 ? (
+                    <ul className="space-y-2">
+                      {summaryData.medications.map((med, index) => (
+                        <li key={index} className="bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                          <p className="font-medium">{med.name}</p>
+                          <p className="text-gray-600 text-xs">Duration: {med.duration || '-'}</p>
+                          <p className="text-gray-600 text-xs">How to take: {med.howToTake || '-'}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No records</p>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Next Follow Up Dates</label>
+                  {summaryData.followUpDates.length > 0 ? (
+                    <ul className="space-y-1">
+                      {summaryData.followUpDates.map((item, index) => (
+                        <li key={index} className="bg-gray-50 px-3 py-2 rounded-lg text-sm">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No records</p>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Final Conclusion</label>
+                  {summaryData.conclusion ? (
+                    <p className="bg-gray-50 px-3 py-2 rounded-lg text-sm whitespace-pre-wrap">
+                      {summaryData.conclusion}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No records</p>
+                  )}
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={closeSummaryModal}
+                    className="btn btn-secondary"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleDownloadSummaryPDF}
+                    disabled={summaryLoading}
+                    className="btn btn-primary"
+                  >
+                    {summaryLoading ? 'Generating...' : 'Generate PDF'}
+                  </button>
+                  <button
+                    onClick={() => setSummaryEditMode(true)}
+                    className="btn btn-primary"
+                  >
+                    Edit Summary
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

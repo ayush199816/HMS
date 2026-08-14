@@ -161,6 +161,28 @@ const admissionSchema = new mongoose.Schema({
       type: String
     }
   }],
+  dischargeSummary: {
+    problemStatements: [String],
+    testsAndFindings: [String],
+    procedures: [String],
+    medications: [
+      {
+        name: { type: String, required: true },
+        duration: { type: String },
+        howToTake: { type: String }
+      }
+    ],
+    followUpDates: [String],
+    conclusion: { type: String, default: '' },
+    generatedAt: {
+      type: Date,
+      default: Date.now
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
   hospitalId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Hospital',

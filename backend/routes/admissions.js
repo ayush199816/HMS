@@ -5,6 +5,7 @@ const Patient = require('../models/Patient');
 const User = require('../models/User');
 const Bed = require('../models/Bed');
 const Bill = require('../models/Bill');
+const Hospital = require('../models/Hospital');
 const { authenticate } = require('../middleware/auth');
 const { cloudinary, upload } = require('../config/cloudinary');
 
@@ -35,6 +36,7 @@ router.get('/', authenticate, async (req, res) => {
       .populate('vitalReports.recordedBy', 'name')
       .populate('medicineUpdates.administeredBy', 'name')
       .populate('createdBy', 'name')
+      .populate({ path: 'dischargeSummary.createdBy', select: 'name' })
       .sort({ admissionDate: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -70,6 +72,7 @@ router.get('/:id', authenticate, async (req, res) => {
       .populate('vitalReports.recordedBy', 'name')
       .populate('medicineUpdates.administeredBy', 'name')
       .populate('createdBy', 'name')
+      .populate({ path: 'dischargeSummary.createdBy', select: 'name' })
       .populate('billIds');
 
     if (!admission) {
@@ -561,6 +564,108 @@ router.put('/:id/medicine-updates/:medicineIndex', authenticate, async (req, res
   } catch (error) {
     console.error('Update medicine error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Save / update discharge summary
+router.put('/:id/discharge-summary', authenticate, async (req, res) => {
+  try {
+    const admission = await Admission.findOne({
+      _id: req.params.id,
+      hospitalId: req.user.hospitalId
+    });
+
+    if (!admission) {
+      return res.status(404).json({ message: 'Admission not found' });
+    }
+
+    const allowedRoles = ['receptionist', 'hospital_admin', 'doctor', 'super_admin'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const {
+      problemStatements,
+      testsAndFindings,
+      procedures,
+      medications,
+      followUpDates,
+      conclusion
+    } = req.body;
+
+    admission.dischargeSummary = {
+      problemStatements: problemStatements || [],
+      testsAndFindings: testsAndFindings || [],
+      procedures: procedures || [],
+      medications: (medications || []).filter(m => m && m.name && m.name.trim()).map(m => ({
+        name: m.name.trim(),
+        duration: m.duration || '',
+        howToTake: m.howToTake || ''
+      })),
+      followUpDates: followUpDates || [],
+      conclusion: conclusion || '',
+      generatedAt: new Date(),
+      createdBy: req.user.id
+    };
+
+    await admission.save();
+    await admission.populate('patientId', 'name phone age gender opdNumber emergencyNumber');
+    await admission.populate('doctorIds', 'name');
+    await admission.populate({ path: 'dischargeSummary.createdBy', select: 'name' });
+
+    res.json({ admission });
+  } catch (error) {
+    console.error('Update discharge summary error:', error);
+    res.status(500).json({ message: 'Server error saving discharge summary' });
+  }
+});
+
+// Generate discharge summary PDF
+router.get('/:id/discharge-summary-pdf', authenticate, async (req, res) => {
+  try {
+    const admission = await Admission.findOne({
+      _id: req.params.id,
+      hospitalId: req.user.hospitalId
+    })
+      .populate('patientId', 'name phone age gender opdNumber emergencyNumber')
+      .populate('doctorIds', 'name')
+      .populate('hospitalId')
+      .populate({ path: 'dischargeSummary.createdBy', select: 'name' });
+
+    if (!admission) {
+      return res.status(404).json({ message: 'Admission not found' });
+    }
+
+    if (!admission.dischargeSummary) {
+      return res.status(400).json({ message: 'No discharge summary found for this admission' });
+    }
+
+    const generateDischargeSummaryPDF = require('../utils/generateDischargeSummaryPDF');
+    const pdfBuffer = await generateDischargeSummaryPDF(
+      admission,
+      admission.hospitalId,
+      admission.patientId
+    );
+
+    const p = admission.patientId || {};
+    const visitId = p.opdNumber || p.emergencyNumber || 'NA';
+    const safeName = (p.name || 'patient').replace(/\s+/g, '-');
+    const apptDate = new Date(admission.dischargeDate || admission.admissionDate).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).replace(/\//g, '-');
+    const filename = `discharge-summary-${safeName}-${apptDate}-${visitId}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Generate discharge summary PDF error:', error);
+    res.status(500).json({ message: 'Server error generating discharge summary PDF' });
   }
 });
 

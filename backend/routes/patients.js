@@ -110,6 +110,7 @@ router.post('/', [
       ayushmanNumber,
       govtSchemeNumber,
       dateOfBirth,
+      gender,
       insuranceProvider,
       insuranceNumber,
       email,
@@ -168,6 +169,7 @@ router.post('/', [
       insuranceProvider: insuranceProvider || '',
       insuranceNumber: insuranceNumber || '',
       email: email || '',
+      gender: gender || 'male',
       previousIllnessHistory: previousIllnessHistory || '',
       currentIssues,
       patientType,
@@ -252,6 +254,7 @@ router.put('/:id', [
       previousIllnessHistory,
       currentIssues,
       assignedDoctorId,
+      gender,
       status
     } = req.body;
 
@@ -282,6 +285,7 @@ router.put('/:id', [
       }
       patient.assignedDoctorId = assignedDoctorId;
     }
+    if (gender) patient.gender = gender;
     if (status) patient.status = status;
 
     await patient.save();

@@ -233,38 +233,46 @@ router.post('/', [
     let assistantDoctorIdList = [];
     if (assistantDoctorIds) {
       const parsedAssistantIds = typeof assistantDoctorIds === 'string' ? JSON.parse(assistantDoctorIds) : assistantDoctorIds;
-      
-      const assistantDoctors = await User.find({
-        _id: { $in: Array.isArray(parsedAssistantIds) ? parsedAssistantIds : [parsedAssistantIds] },
-        hospitalId: hospitalId,
-        role: 'doctor',
-        isActive: true
-      });
+      const values = Array.isArray(parsedAssistantIds) ? parsedAssistantIds : [parsedAssistantIds];
+      const filteredValues = values.filter(id => id);
 
-      if (assistantDoctors.length === 0) {
-        return res.status(404).json({ message: 'No valid assistant doctors found' });
+      if (filteredValues.length > 0) {
+        const assistantDoctors = await User.find({
+          _id: { $in: filteredValues },
+          hospitalId: hospitalId,
+          role: 'doctor',
+          isActive: true
+        });
+
+        if (assistantDoctors.length === 0) {
+          return res.status(404).json({ message: 'No valid assistant doctors found' });
+        }
+
+        assistantDoctorIdList = assistantDoctors.map(d => d._id);
       }
-
-      assistantDoctorIdList = assistantDoctors.map(d => d._id);
     }
 
     // Verify nurses if provided
     let nurseIdList = [];
     if (assignedNurseIds) {
       const parsedNurseIds = typeof assignedNurseIds === 'string' ? JSON.parse(assignedNurseIds) : assignedNurseIds;
-      
-      const nurses = await User.find({
-        _id: { $in: Array.isArray(parsedNurseIds) ? parsedNurseIds : [parsedNurseIds] },
-        hospitalId: hospitalId,
-        role: 'nurse',
-        isActive: true
-      });
+      const values = Array.isArray(parsedNurseIds) ? parsedNurseIds : [parsedNurseIds];
+      const filteredValues = values.filter(id => id);
 
-      if (nurses.length === 0) {
-        return res.status(404).json({ message: 'No valid nurses found' });
+      if (filteredValues.length > 0) {
+        const nurses = await User.find({
+          _id: { $in: filteredValues },
+          hospitalId: hospitalId,
+          role: 'nurse',
+          isActive: true
+        });
+
+        if (nurses.length === 0) {
+          return res.status(404).json({ message: 'No valid nurses found' });
+        }
+
+        nurseIdList = nurses.map(n => n._id);
       }
-
-      nurseIdList = nurses.map(n => n._id);
     }
 
     // Check if patient already has an appointment with this doctor on the same date
@@ -583,8 +591,16 @@ router.get('/:id/bill-pdf', authenticate, async (req, res) => {
       appointment.createdBy
     );
 
+    const visitId = appointment.patientId.opdNumber || appointment.patientId.emergencyNumber || 'NA';
+    const safeName = (appointment.patientId.name || 'patient').replace(/\s+/g, '-');
+    const apptDate = new Date(appointment.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const filename = `bill-${safeName}-${apptDate}-${visitId}.pdf`;
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=appointment-bill-${id}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(pdfBuffer);
   } catch (error) {
     console.error('Generate appointment bill PDF error:', error);
@@ -624,8 +640,16 @@ router.get('/:id/prescription-pdf', authenticate, async (req, res) => {
       appointment.doctorId
     );
 
+    const visitId = appointment.patientId.opdNumber || appointment.patientId.emergencyNumber || 'NA';
+    const safeName = (appointment.patientId.name || 'patient').replace(/\s+/g, '-');
+    const apptDate = new Date(appointment.appointmentDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+    const filename = `prescription-${safeName}-${apptDate}-${visitId}.pdf`;
+
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=prescription-${id}.pdf`);
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.send(pdfBuffer);
   } catch (error) {
     console.error('Generate prescription PDF error:', error);

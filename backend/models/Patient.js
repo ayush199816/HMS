@@ -37,6 +37,11 @@ const patientSchema = new mongoose.Schema({
   dateOfBirth: {
     type: Date
   },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other'],
+    default: 'male'
+  },
   insuranceProvider: {
     type: String,
     default: ''

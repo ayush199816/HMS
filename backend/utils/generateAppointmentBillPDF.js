@@ -63,6 +63,7 @@ async function generateAppointmentBillPDF(appointment, hospital, patient, doctor
       doc.moveDown(0.5);
 
       // Table 1: DOCTOR INFORMATION
+      doc.x = 50;
       doc.fontSize(12).font('Helvetica-Bold').text('1. DOCTOR INFORMATION:');
       drawTableBox(doc, [
         { label: 'Doctor:', value: `Dr. ${doctor.name}` },
@@ -72,6 +73,7 @@ async function generateAppointmentBillPDF(appointment, hospital, patient, doctor
       doc.moveDown(0.5);
 
       // Table 2: APPOINTMENT DETAILS
+      doc.x = 50;
       doc.fontSize(12).font('Helvetica-Bold').text('2. APPOINTMENT DETAILS:');
       
       const appointmentDate = new Date(appointment.appointmentDate);
@@ -93,6 +95,7 @@ async function generateAppointmentBillPDF(appointment, hospital, patient, doctor
       doc.moveDown(0.5);
 
       // Table 3: BILLING DETAILS
+      doc.x = 50;
       doc.fontSize(12).font('Helvetica-Bold').text('3. BILLING DETAILS:');
       
       const paymentDate = bill?.paymentDetails?.paymentDate 

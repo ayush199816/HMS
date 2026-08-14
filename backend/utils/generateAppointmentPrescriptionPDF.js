@@ -21,22 +21,21 @@ async function generateAppointmentPrescriptionPDF(appointment, hospital, patient
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Header Section - Hospital Information (pre-printed)
-      doc.fontSize(20).font('Helvetica-Bold').text(hospital.name || 'Hospital', { align: 'center' });
-      doc.fontSize(11).font('Helvetica').text(hospital.address || '', { align: 'center' });
-      doc.text(`Contact: ${hospital.phone || ''}`, { align: 'center' });
-      doc.text(`Registration No: ${hospital.registrationNumber || ''}`, { align: 'center' });
+      // Header space for pre-printed hospital header
+      doc.y += 80;
 
-      doc.moveDown(0.5);
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      // Small side-by-side boxes
+      const boxY = doc.y;
+      const boxPadding = 6;
+      const leftBoxX = 50;
+      const leftBoxW = 240;
+      const rightBoxX = leftBoxX + leftBoxW + 20;
+      const rightBoxW = 230;
+      const valueOffset = 105;
 
-      // Patient details and blank photo/box area
-      const startY = doc.y + 20;
-      const rowHeight = 22;
-      const boxSize = 100;
-
-      // Small blank box on the right
-      doc.rect(400, startY, boxSize, boxSize).stroke();
+      const apptDate = new Date(appointment.appointmentDate).toLocaleDateString('en-GB', {
+        day: '2-digit', month: '2-digit', year: 'numeric'
+      }).replace(/\//g, '-');
 
       const visitId = patient.opdNumber
         ? `OPD ID: ${patient.opdNumber}`
@@ -49,38 +48,44 @@ async function generateAppointmentPrescriptionPDF(appointment, hospital, patient
         { label: 'OPDID/Emergency ID:', value: visitId.replace(/^(OPD ID|Emergency ID): /, '') },
         { label: 'Age:', value: patient.age ? patient.age.toString() : '' },
         { label: 'Gender:', value: patient.gender || '' },
-        { label: 'Doctor visiting:', value: doctor?.name ? `Dr. ${doctor.name}` : '' }
+        { label: 'Doctor visiting:', value: doctor?.name ? `Dr. ${doctor.name}` : '' },
+        { label: 'Date:', value: apptDate },
+        { label: 'Queue No:', value: appointment.queueNumber ? appointment.queueNumber.toString() : '' }
       ];
 
-      details.forEach((item, index) => {
-        const rowY = startY + (index * rowHeight);
-        doc.fontSize(11).font('Helvetica-Bold').text(item.label, leftCol, rowY);
-        doc.font('Helvetica').text(item.value, leftCol + labelValueOffset, rowY);
+      // Draw left text first
+      let currentY = boxY + boxPadding;
+      const valueX = leftBoxX + boxPadding + valueOffset;
+      const valueWidth = leftBoxW - boxPadding - valueOffset - 6;
+
+      details.forEach((item) => {
+        doc.fontSize(8).font('Helvetica-Bold').text(item.label, leftBoxX + boxPadding, currentY, { width: 95 });
+        doc.font('Helvetica').text(item.value, valueX, currentY, { width: valueWidth, lineBreak: true });
+        currentY = Math.max(doc.y + 4, currentY + 14);
       });
+      const leftBottom = doc.y + boxPadding;
 
-      // Vitals section below the details and blank box
-      let vitalsY = startY + (details.length * rowHeight) + 30;
-      const boxBottom = startY + boxSize + 20;
-      if (vitalsY < boxBottom) vitalsY = boxBottom;
-
-      doc.moveTo(50, vitalsY).lineTo(545, vitalsY).stroke();
-      vitalsY += 15;
-
-      doc.fontSize(12).font('Helvetica-Bold').text('Vitals', leftCol, vitalsY);
-      vitalsY += 25;
+      // Draw right text
+      currentY = boxY + boxPadding;
+      const vitalValueX = rightBoxX + boxPadding + 70;
 
       const vitals = [
-        { label: 'BP:' },
-        { label: 'Heart Rate:' },
-        { label: 'Weight:' },
-        { label: 'SpO2:' }
+        { label: 'BP:', value: '' },
+        { label: 'Heart Rate:', value: '' },
+        { label: 'Weight:', value: '' },
+        { label: 'SpO2:', value: '' }
       ];
 
       vitals.forEach((item) => {
-        doc.fontSize(11).font('Helvetica-Bold').text(item.label, leftCol, vitalsY);
-        doc.font('Helvetica').text('_________________', leftCol + labelValueOffset, vitalsY);
-        vitalsY += 25;
+        doc.fontSize(8).font('Helvetica-Bold').text(item.label, rightBoxX + boxPadding, currentY, { width: 65 });
+        doc.font('Helvetica').text('_________', vitalValueX, currentY);
+        currentY = Math.max(doc.y + 4, currentY + 14);
       });
+      const rightBottom = doc.y + boxPadding;
+
+      // Draw boxes around the text so they are only as big as the content
+      doc.rect(leftBoxX, boxY, leftBoxW, leftBottom - boxY).stroke();
+      doc.rect(rightBoxX, boxY, rightBoxW, rightBottom - boxY).stroke();
 
       doc.end();
     } catch (error) {

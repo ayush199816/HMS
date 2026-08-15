@@ -93,6 +93,7 @@ router.post('/', authenticate, upload.single('prescriptionFile'), async (req, re
       patientId,
       doctorIds,
       assistantDoctorIds,
+      admissionDate,
       admissionReason,
       prescription,
       bedType,
@@ -184,21 +185,31 @@ router.post('/', authenticate, upload.single('prescriptionFile'), async (req, re
 
     // Find and update bed status
     let bedId = null;
+    let bed = null;
     if (bedNumber && bedType) {
-      const bed = await Bed.findOne({
+      bed = await Bed.findOne({
         bedNumber,
         wardType: bedType,
         hospitalId: req.user.hospitalId,
         status: 'available'
       });
 
+      // Handle orphaned occupied bed (left over by a previous failed admission)
+      if (!bed) {
+        bed = await Bed.findOne({
+          bedNumber,
+          wardType: bedType,
+          hospitalId: req.user.hospitalId,
+          status: 'occupied',
+          currentAdmission: null
+        });
+      }
+
       if (!bed) {
         return res.status(400).json({ message: 'Bed not available or already occupied' });
       }
 
       bedId = bed._id;
-      bed.status = 'occupied';
-      await bed.save();
     }
 
     // Upload prescription file if provided
@@ -219,6 +230,7 @@ router.post('/', authenticate, upload.single('prescriptionFile'), async (req, re
       patientId,
       doctorIds: doctorIdList,
       assistantDoctorIds: assistantDoctorIdList,
+      admissionDate: admissionDate ? new Date(admissionDate) : undefined,
       admissionReason,
       prescription,
       prescriptionFile: prescriptionFileUrl,
@@ -250,11 +262,11 @@ router.post('/', authenticate, upload.single('prescriptionFile'), async (req, re
 
     await admission.save();
 
-    // Link admission to bed
-    if (bedId) {
-      await Bed.findByIdAndUpdate(bedId, {
-        currentAdmission: admission._id
-      });
+    // Mark bed as occupied and link to the saved admission
+    if (bed) {
+      bed.status = 'occupied';
+      bed.currentAdmission = admission._id;
+      await bed.save();
     }
 
     await admission.populate('patientId', 'name phone age gender');
@@ -288,7 +300,8 @@ router.put('/:id', authenticate, async (req, res) => {
       bedNumber,
       assignedNurses,
       status,
-      dischargeDate
+      dischargeDate,
+      admissionDate
     } = req.body;
 
     const bedOrDischargeChanged = bedType || bedNumber || status || dischargeDate;
@@ -429,6 +442,7 @@ router.put('/:id', authenticate, async (req, res) => {
     }
 
     if (dischargeDate && !isDischarged) admission.dischargeDate = new Date(dischargeDate);
+    if (admissionDate) admission.admissionDate = new Date(admissionDate);
 
     await admission.save();
     await admission.populate('patientId', 'name phone age gender');

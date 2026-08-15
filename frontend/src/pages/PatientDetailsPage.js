@@ -32,8 +32,10 @@ const PatientDetailsPage = () => {
   const [pathologyBookings, setPathologyBookings] = useState([]);
   const [radiologyBookings, setRadiologyBookings] = useState([]);
   const [bills, setBills] = useState([]);
+  const [admissions, setAdmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [warnings, setWarnings] = useState([]);
   const [showAppointmentForm, setShowAppointmentForm] = useState(false);
   const [showPathologyForm, setShowPathologyForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -134,7 +136,7 @@ const PatientDetailsPage = () => {
       setMedicalRecords(recordsMap);
       
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch appointments']);
     }
   }, [api, id]);
 
@@ -176,7 +178,7 @@ const PatientDetailsPage = () => {
       });
       setDoctors(response.data.doctors || []);
     } catch (error) {
-      console.error('Error fetching doctors:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch doctors']);
     }
   }, [api, user?.hospitalId]);
 
@@ -199,7 +201,7 @@ const PatientDetailsPage = () => {
       });
       setPathologyTests(response.data.tests || []);
     } catch (error) {
-      console.error('Error fetching pathology tests:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch pathology tests']);
     }
   }, [api, user?.hospitalId]);
 
@@ -209,7 +211,7 @@ const PatientDetailsPage = () => {
       const response = await api.get(`/pathology-bookings/patient/${id}`);
       setPathologyBookings(response.data.bookings || []);
     } catch (error) {
-      console.error('Error fetching pathology bookings:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch pathology bookings']);
     }
   }, [api, id]);
 
@@ -219,7 +221,7 @@ const PatientDetailsPage = () => {
       const response = await api.get(`/radiology-bookings/patient/${id}`);
       setRadiologyBookings(response.data.bookings || []);
     } catch (error) {
-      console.error('Error fetching radiology bookings:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch radiology bookings']);
     }
   }, [api, id]);
 
@@ -229,13 +231,24 @@ const PatientDetailsPage = () => {
       const response = await api.get(`/billing/patient/${id}/history`);
       setBills(response.data.paymentHistory || []);
     } catch (error) {
-      console.error('Error fetching patient bills:', error);
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch bills']);
+    }
+  }, [api, id]);
+
+  const fetchPatientAdmissions = useCallback(async () => {
+    try {
+      const response = await api.get(`/admissions?patientId=${id}`);
+      setAdmissions(response.data.admissions || []);
+    } catch (error) {
+      setWarnings(prev => [...prev, error.response?.data?.message || 'Failed to fetch admissions']);
     }
   }, [api, id]);
 
   useEffect(() => {
     if (id && user?.hospitalId) {
       setLoading(true);
+      setError('');
+      setWarnings([]);
       Promise.all([
         fetchPatientDetails(),
         fetchPatientAppointments(),
@@ -243,10 +256,11 @@ const PatientDetailsPage = () => {
         fetchPathologyTests(),
         fetchPathologyBookings(),
         fetchRadiologyBookings(),
-        fetchPatientBills()
+        fetchPatientBills(),
+        fetchPatientAdmissions()
       ]).finally(() => setLoading(false));
     }
-  }, [id, fetchPatientDetails, fetchPatientAppointments, fetchDoctors, fetchPathologyTests, fetchPathologyBookings, fetchRadiologyBookings, fetchPatientBills, user?.hospitalId]);
+  }, [id, fetchPatientDetails, fetchPatientAppointments, fetchDoctors, fetchPathologyTests, fetchPathologyBookings, fetchRadiologyBookings, fetchPatientBills, fetchPatientAdmissions, user?.hospitalId]);
 
   // Handle URL parameters for automatic pathology modal opening
   useEffect(() => {
@@ -434,6 +448,17 @@ const PatientDetailsPage = () => {
         <div className="alert alert-danger flex items-center mb-6">
           <AlertCircle className="h-5 w-5 mr-2" />
           {error}
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="alert alert-warning mb-6">
+          {warnings.map((warning, index) => (
+            <div key={index} className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2" />
+              {warning}
+            </div>
+          ))}
         </div>
       )}
 
@@ -1062,6 +1087,89 @@ const PatientDetailsPage = () => {
                         </div>
                       )}
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Admission History Section */}
+      <div className="lg:col-span-3 mt-6">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Admission & Bed History</h2>
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-gray-400" />
+              <span className="text-sm text-gray-500">
+                {admissions.length} admission{admissions.length !== 1 ? 's' : ''} found
+              </span>
+            </div>
+          </div>
+          <div className="card-body">
+            {admissions.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600">No admission history found</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {admissions.map((admission) => (
+                  <div key={admission._id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                          <Calendar className="h-4 w-4 text-indigo-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">
+                            {admission.admissionId || admission._id.slice(-8)}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            {formatDateIST(admission.admissionDate)} - {admission.status?.toUpperCase()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-4">
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">Doctors:</span>
+                        <p className="mt-1">
+                          {admission.doctorIds?.map(d => d.name).join(', ') || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">Current Bed:</span>
+                        <p className="mt-1">
+                          {admission.bedId?.bedNumber || admission.bedNumber} ({admission.bedId?.wardType || admission.bedType})
+                        </p>
+                      </div>
+                    </div>
+
+                    {admission.bedHistory?.length > 0 && (
+                      <div className="border-t pt-3">
+                        <h6 className="text-sm font-medium text-gray-700 mb-2">Bed Shift History</h6>
+                        <div className="space-y-2">
+                          {admission.bedHistory.map((entry, index) => (
+                            <div key={index} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
+                              <div>
+                                <span className="font-medium">{entry.bedNumber}</span>
+                                <span className="text-gray-500 ml-2">({entry.bedType?.replace('_', ' ')})</span>
+                                <span className="text-gray-500 ml-2">₹{entry.pricePerDay}/day</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-gray-500">
+                                  {formatDateIST(entry.startDate)}
+                                  {entry.endDate ? ` - ${formatDateIST(entry.endDate)}` : ' - Present'}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -218,14 +218,19 @@ const HospitalAdminDashboard = () => {
   };
 
   const handleDelete = async (itemId) => {
-    if (!window.confirm(`Are you sure you want to deactivate this ${activeTab === 'departments' ? 'department' : 'staff member'}?`)) {
+    if (!window.confirm(`Are you sure you want to deactivate this ${
+      activeTab === 'departments' ? 'department' : activeTab === 'users' ? 'user' : 'staff member'
+    }?`)) {
       return;
     }
 
     try {
-      await api.delete(`/${activeTab}/${itemId}`);
+      const endpoint = activeTab === 'users' ? `/auth/users/${itemId}` : `/${activeTab}/${itemId}`;
+      await api.delete(endpoint);
       if (activeTab === 'departments') {
         setDepartments(prev => prev.filter(d => d._id !== itemId));
+      } else if (activeTab === 'users') {
+        setUsers(prev => prev.filter(u => u._id !== itemId));
       } else {
         setStaff(prev => prev.filter(s => s._id !== itemId));
       }
@@ -833,6 +838,9 @@ const HospitalAdminDashboard = () => {
                             <div>
                               <div className="font-medium text-gray-900">{item.name}</div>
                               <div className="text-sm text-gray-500">{item.email}</div>
+                              {activeTab === 'staff' && (
+                                <div className="text-xs text-gray-400">ID: {item.staffId || 'N/A'}</div>
+                              )}
                             </div>
                           </div>
                         </td>

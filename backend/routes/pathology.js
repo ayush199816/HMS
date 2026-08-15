@@ -190,14 +190,13 @@ router.put('/tests/:id', authenticate, async (req, res) => {
   }
 });
 
-// Delete pathology test (soft delete)
+// Delete pathology test
 router.delete('/tests/:id', authenticate, async (req, res) => {
   try {
-    const test = await PathologyTest.findOneAndUpdate(
-      { _id: req.params.id, hospitalId: req.user.hospitalId },
-      { isActive: false },
-      { new: true }
-    );
+    const test = await PathologyTest.findOneAndDelete({
+      _id: req.params.id,
+      hospitalId: req.user.hospitalId
+    });
     
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });

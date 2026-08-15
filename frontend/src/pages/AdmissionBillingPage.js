@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { formatDateIST } from '../utils/dateUtils';
+import { formatDateIST, toISTDateTimeLocal } from '../utils/dateUtils';
 import axios from 'axios';
 import {
   ArrowLeft,
@@ -40,6 +40,7 @@ const AdmissionBillingPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [billToPay, setBillToPay] = useState(null);
+  const [admissionDateInput, setAdmissionDateInput] = useState('');
 
   const fetchAdmissionDetails = useCallback(async () => {
     try {
@@ -47,6 +48,11 @@ const AdmissionBillingPage = () => {
       setError('');
       const response = await api.get(`/admissions/${admissionId}`);
       setAdmission(response.data.admission);
+      setAdmissionDateInput(
+        response.data.admission.admissionDate
+          ? toISTDateTimeLocal(response.data.admission.admissionDate).split('T')[0]
+          : ''
+      );
       setBills(response.data.admission.billIds || []);
       
       // Fetch doctors for assistant doctor selection
@@ -63,6 +69,23 @@ const AdmissionBillingPage = () => {
       setLoading(false);
     }
   }, [admissionId, api]);
+
+  const updateAdmissionDate = async () => {
+    try {
+      setError('');
+      const response = await api.put(`/admissions/${admissionId}`, {
+        admissionDate: new Date(admissionDateInput).toISOString()
+      });
+      setAdmission(response.data.admission);
+      setAdmissionDateInput(
+        response.data.admission.admissionDate
+          ? toISTDateTimeLocal(response.data.admission.admissionDate).split('T')[0]
+          : ''
+      );
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to update admission date');
+    }
+  };
 
   useEffect(() => {
     fetchAdmissionDetails();
@@ -498,11 +521,22 @@ const AdmissionBillingPage = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <Calendar className="h-5 w-5 text-gray-400" />
-                <div>
+                <div className="w-full">
                   <p className="text-sm text-gray-500">Admitted On</p>
-                  <p className="font-medium">
-                    {admission?.admissionDate ? formatDateIST(admission.admissionDate) : 'N/A'}
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="date"
+                      value={admissionDateInput}
+                      onChange={(e) => setAdmissionDateInput(e.target.value)}
+                      className="form-input py-1 px-2 text-sm"
+                    />
+                    <button
+                      onClick={updateAdmissionDate}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                    >
+                      Update
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

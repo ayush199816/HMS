@@ -1,9 +1,83 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Plus, Calendar, DollarSign, User, AlertCircle, Download, FileText } from 'lucide-react';
+import { Search, Plus, Calendar, DollarSign, User, AlertCircle, Download, FileText, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDateIST, formatTimeIST, toISTDateTimeLocal, appendISTOffset } from '../utils/dateUtils';
 import axios from 'axios';
+
+function SearchableSelect({ name, options, value, onChange, getLabel, placeholder, searchPlaceholder, required }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapperRef = useRef(null);
+
+  const selected = options.find(o => o._id === value);
+  const filtered = options.filter(o => getLabel(o).toLowerCase().includes(search.toLowerCase()));
+  const visible = filtered.slice(0, 100);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <input type="hidden" name={name} value={value} required={required} onChange={() => {}} />
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="form-input w-full flex items-center justify-between text-left bg-white"
+      >
+        <span className={selected ? 'text-gray-900' : 'text-gray-400'}>
+          {selected ? getLabel(selected) : placeholder}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'transform rotate-180' : ''}`} />
+      </button>
+      {isOpen && (
+        <div className="absolute z-50 left-0 top-full w-full bg-white border border-gray-200 rounded-md mt-1 shadow-lg max-h-72 overflow-y-auto overscroll-contain">
+          <div className="p-2 border-b sticky top-0 bg-white z-10">
+            <input
+              type="text"
+              className="form-input w-full"
+              placeholder={searchPlaceholder || 'Type to search...'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <ul className="list-none p-0 m-0">
+            {visible.length === 0 ? (
+              <li className="p-3 text-sm text-gray-500">No matches found</li>
+            ) : (
+              visible.map(option => (
+                <li
+                  key={option._id}
+                  className={`p-3 text-sm cursor-pointer hover:bg-blue-50 ${value === option._id ? 'bg-blue-50 font-medium' : ''}`}
+                  onClick={() => {
+                    onChange(option._id);
+                    setSearch('');
+                    setIsOpen(false);
+                  }}
+                >
+                  {getLabel(option)}
+                </li>
+              ))
+            )}
+            {filtered.length > 100 && (
+              <li className="p-2 text-xs text-gray-400 text-center">
+                {filtered.length - 100} more results — type to narrow
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const AppointmentsPage = () => {
   const navigate = useNavigate();
@@ -476,37 +550,29 @@ const AppointmentsPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="form-label">Select Patient *</label>
-                <select
+                <SearchableSelect
                   name="patientId"
+                  options={patients}
                   value={appointmentFormData.patientId}
-                  onChange={handleAppointmentInputChange}
-                  className="form-input"
+                  onChange={(value) => handleAppointmentInputChange({ target: { name: 'patientId', value } })}
+                  getLabel={(patient) => `${patient.name} - ${patient.opdNumber || patient.emergencyNumber || 'No ID'} (${patient.phone})`}
+                  placeholder="Select Patient *"
+                  searchPlaceholder="Search patients..."
                   required
-                >
-                  <option value="">Choose a patient...</option>
-                  {patients.map((patient) => (
-                    <option key={patient._id} value={patient._id}>
-                      {patient.name} - {patient.opdNumber || patient.emergencyNumber || 'No ID'} ({patient.phone})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="form-label">Doctor *</label>
-                <select
+                <SearchableSelect
                   name="doctorId"
+                  options={doctors}
                   value={appointmentFormData.doctorId}
-                  onChange={handleAppointmentInputChange}
-                  className="form-input"
+                  onChange={(value) => handleAppointmentInputChange({ target: { name: 'doctorId', value } })}
+                  getLabel={(doctor) => `Dr. ${doctor.name} - ${doctor.specialities?.join(', ') || 'General'}`}
+                  placeholder="Select Doctor *"
+                  searchPlaceholder="Search doctors..."
                   required
-                >
-                  <option value="">Select Doctor</option>
-                  {doctors.map((doctor) => (
-                    <option key={doctor._id} value={doctor._id}>
-                      Dr. {doctor.name} - {doctor.specialities?.join(', ') || 'General'}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="form-label">Date & Time *</label>

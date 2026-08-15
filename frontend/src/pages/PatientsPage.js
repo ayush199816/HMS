@@ -11,6 +11,7 @@ const PatientsPage = () => {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [showPatientForm, setShowPatientForm] = useState(false);
   const [patientFormData, setPatientFormData] = useState({
@@ -97,6 +98,7 @@ const PatientsPage = () => {
   const handlePatientSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
     const dataToSend = { ...patientFormData };
     if (dataToSend.dateOfBirth) {
@@ -135,12 +137,24 @@ const PatientsPage = () => {
         insuranceNumber: '',
         govtSchemeNumber: ''
       });
+      setFieldErrors({});
       setShowPatientForm(false);
       fetchPatients();
     } catch (error) {
       console.error('Frontend: Patient creation error:', error);
       console.error('Frontend: Error response:', error.response?.data);
-      setError(error.response?.data?.message || 'Failed to create patient');
+      const backendErrors = error.response?.data?.errors;
+      if (Array.isArray(backendErrors) && backendErrors.length > 0) {
+        const errorsMap = {};
+        backendErrors.forEach(err => {
+          errorsMap[err.path] = err.msg;
+        });
+        setFieldErrors(errorsMap);
+        setError('Please correct the errors in the form.');
+      } else {
+        setFieldErrors({});
+        setError(error.response?.data?.message || 'Failed to create patient');
+      }
     }
   };
 
@@ -157,9 +171,20 @@ const PatientsPage = () => {
           </div>
 
           {error && (
-            <div className="alert alert-danger flex items-center mb-4">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              {error}
+            <div className="alert alert-danger flex items-start mb-4">
+              <AlertCircle className="h-5 w-5 mr-2 mt-0.5" />
+              <div>
+                <p className="font-medium">{error}</p>
+                {Object.keys(fieldErrors).length > 0 && (
+                  <ul className="list-disc list-inside mt-1 text-sm">
+                    {Object.entries(fieldErrors).map(([field, msg]) => (
+                      <li key={field}>
+                        <span className="capitalize">{field.replace(/([A-Z])/g, ' $1')}:</span> {msg}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
 
@@ -402,19 +427,18 @@ const PatientsPage = () => {
                 <th className="table-header-cell">Type</th>
                 <th className="table-header-cell">Contact</th>
                 <th className="table-header-cell">Status</th>
-                <th className="table-header-cell">Actions</th>
               </tr>
             </thead>
             <tbody className="table-body">
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="table-body-cell text-center py-8">
+                  <td colSpan="4" className="table-body-cell text-center py-8">
                     <div className="spinner mx-auto"></div>
                   </td>
                 </tr>
               ) : filteredPatients.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="table-body-cell text-center py-8">
+                  <td colSpan="4" className="table-body-cell text-center py-8">
                     <div className="text-gray-500">
                       {searchTerm ? 'No patients found matching your search.' : 'No patients found.'}
                     </div>
@@ -462,22 +486,6 @@ const PatientsPage = () => {
                         <div className="text-gray-500 mt-1">
                           Balance: ₹{patient.balanceAmount || 0}
                         </div>
-                      </div>
-                    </td>
-                    <td className="table-body-cell">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          View
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-900"
-                          title="Billing"
-                        >
-                          Bill
-                        </button>
                       </div>
                     </td>
                   </tr>

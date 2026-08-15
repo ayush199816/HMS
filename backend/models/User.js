@@ -102,6 +102,12 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  staffId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
   }
 });
 
@@ -122,6 +128,24 @@ userSchema.pre('save', async function(next) {
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
+
+// Generate staff ID before saving
+userSchema.pre('save', async function(next) {
+  if (this.isNew && !this.staffId && this.role !== 'super_admin') {
+    const year = new Date().getFullYear();
+    const prefix = 'STF';
+    const count = await this.constructor.countDocuments({
+      hospitalId: this.hospitalId,
+      createdAt: {
+        $gte: new Date(year, 0, 1),
+        $lt: new Date(year + 1, 0, 1)
+      }
+    });
+    const sequence = (count + 1).toString().padStart(4, '0');
+    this.staffId = `${prefix}${year}${sequence}`;
+  }
+  next();
+});
 
 // Update timestamp on save
 userSchema.pre('save', function(next) {

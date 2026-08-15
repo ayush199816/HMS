@@ -89,7 +89,7 @@ router.post('/', [
   body('name').notEmpty().withMessage('Patient name is required'),
   body('age').isInt({ min: 0, max: 150 }).withMessage('Age must be between 0 and 150'),
   body('phone').notEmpty().withMessage('Phone number is required'),
-  body('aadharNumber').matches(/^\d{12}$/).withMessage('Aadhar number must be 12 digits'),
+  body('aadharNumber').optional({ checkFalsy: true }).matches(/^\d{12}$/).withMessage('Aadhar number must be 12 digits'),
   body('currentIssues').notEmpty().withMessage('Current issues are required'),
   body('patientType').isIn(['opd', 'emergency']).withMessage('Patient type must be OPD or Emergency'),
   body('hospitalId').notEmpty().withMessage('Hospital ID is required'),
@@ -139,13 +139,15 @@ router.post('/', [
     // It will be assigned when creating appointments
 
     // Check if patient with same Aadhar number already exists in this hospital
-    const existingPatient = await Patient.findOne({ 
-      aadharNumber, 
-      hospitalId,
-      isActive: true 
-    });
-    if (existingPatient) {
-      return res.status(400).json({ message: 'Patient with this Aadhar number already exists in this hospital' });
+    if (aadharNumber) {
+      const existingPatient = await Patient.findOne({ 
+        aadharNumber, 
+        hospitalId,
+        isActive: true 
+      });
+      if (existingPatient) {
+        return res.status(400).json({ message: 'Patient with this Aadhar number already exists in this hospital' });
+      }
     }
 
     // Create patient (without doctor assignment)

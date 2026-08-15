@@ -23,8 +23,13 @@ const patientSchema = new mongoose.Schema({
   },
   aadharNumber: {
     type: String,
-    required: [true, 'Aadhar number is required'],
-    match: [/^\d{12}$/, 'Aadhar number must be 12 digits']
+    default: '',
+    validate: {
+      validator: function(v) {
+        return v === '' || /^\d{12}$/.test(v);
+      },
+      message: 'Aadhar number must be 12 digits'
+    }
   },
   ayushmanNumber: {
     type: String,

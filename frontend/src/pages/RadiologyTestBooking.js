@@ -43,7 +43,7 @@ const RadiologyTestBooking = () => {
   // Fetch tests
   const fetchTests = useCallback(async () => {
     try {
-      const response = await api.get('/radiology/tests');
+      const response = await api.get('/radiology/tests', { params: { limit: 100000 } });
       setTests(response.data.tests);
     } catch (error) {
       console.error('Error fetching tests:', error);

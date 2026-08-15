@@ -53,7 +53,10 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.json({ staff });
     }
 
-    if (req.user.hospitalId && req.user.hospitalId.toString() !== staff.hospitalId._id.toString()) {
+    const userHospitalId = req.user.hospitalId?._id
+      ? req.user.hospitalId._id.toString()
+      : req.user.hospitalId?.toString();
+    if (userHospitalId && userHospitalId !== staff.hospitalId._id.toString()) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -306,8 +309,11 @@ router.delete('/:id', authenticate, async (req, res) => {
     }
 
     // Check permissions
+    const userHospitalId = req.user.hospitalId?._id
+      ? req.user.hospitalId._id.toString()
+      : req.user.hospitalId?.toString();
     if (req.user.role !== 'super_admin' && 
-        (!req.user.hospitalId || req.user.hospitalId.toString() !== staff.hospitalId.toString())) {
+        (!userHospitalId || userHospitalId !== staff.hospitalId.toString())) {
       return res.status(403).json({ message: 'Access denied' });
     }
 

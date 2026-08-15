@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, AlertCircle, Users } from 'lucide-react';
+import { toISTDateTimeLocal } from '../utils/dateUtils';
 
 const AdmissionForm = () => {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ const AdmissionForm = () => {
     patientId: searchParams.get('patientId') || '',
     doctorIds: [],
     assistantDoctorIds: [],
+    admissionDate: toISTDateTimeLocal().split('T')[0],
     admissionReason: '',
     prescription: '',
     prescriptionFile: null,
@@ -124,6 +126,7 @@ const AdmissionForm = () => {
       
       formDataToSend.append('doctorIds', JSON.stringify(cleanDoctorIds));
       formDataToSend.append('assistantDoctorIds', JSON.stringify(cleanAssistantDoctorIds));
+      formDataToSend.append('admissionDate', new Date(formData.admissionDate).toISOString());
       formDataToSend.append('admissionReason', formData.admissionReason);
       formDataToSend.append('prescription', formData.prescription);
       formDataToSend.append('bedType', formData.bedType);
@@ -250,6 +253,19 @@ const AdmissionForm = () => {
             <h2 className="card-title text-sm">Admission Details</h2>
           </div>
           <div className="card-body p-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Admission Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.admissionDate}
+                onChange={(e) => setFormData({ ...formData, admissionDate: e.target.value })}
+                className="form-input w-full"
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Admission Reason *
@@ -548,7 +564,7 @@ const AdmissionForm = () => {
         {/* Nurse Assignment */}
         <div className="card">
           <div className="card-header p-4">
-            <h2 className="card-title text-sm">Nurse Assignment</h2>
+            <h2 className="card-title text-sm">Nurse Assignment (Optional)</h2>
           </div>
           <div className="card-body p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

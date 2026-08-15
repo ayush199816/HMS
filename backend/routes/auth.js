@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Hospital = require('../models/Hospital');
+const Department = require('../models/Department');
 const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
@@ -520,6 +521,41 @@ router.put('/users/:id/status', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Update user status error:', error);
     res.status(500).json({ message: 'Server error updating user status' });
+  }
+});
+
+// Deactivate user (hospital admin/super admin)
+router.delete('/users/:id', authenticate, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check permissions
+    const userHospitalId = req.user.hospitalId?._id
+      ? req.user.hospitalId._id.toString()
+      : req.user.hospitalId?.toString();
+    if (req.user.role !== 'super_admin' &&
+        (!userHospitalId || userHospitalId !== user.hospitalId.toString())) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    user.isActive = false;
+    await user.save();
+
+    // Remove from department staff list
+    if (user.departmentId) {
+      await Department.findByIdAndUpdate(
+        user.departmentId,
+        { $pull: { staff: user._id } }
+      );
+    }
+
+    res.json({ message: 'User deactivated successfully' });
+  } catch (error) {
+    console.error('Deactivate user error:', error);
+    res.status(500).json({ message: 'Server error deactivating user' });
   }
 });
 

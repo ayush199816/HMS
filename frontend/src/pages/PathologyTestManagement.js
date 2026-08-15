@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { 
@@ -49,7 +49,7 @@ const PathologyTestManagement = () => {
   });
 
   // Predefined test data for quick seeding
-  const predefinedTests = {
+  const predefinedTests = useMemo(() => ({
     'Hematology': [
       'Hemoglobin', 'TLC', 'DLC', 'RBC Count', 'Eosinophil Count', 'Platelet Count',
       'BT', 'CT', 'ESR', 'PCV/Hematocrit', 'Complete Hemogram', 'PBF for Type of Anemia',
@@ -96,7 +96,7 @@ const PathologyTestManagement = () => {
       'HIV, HBsAg, HCV, Syphilis, Malaria Parasite', 'Coombs Crossmatch',
       'Blood Grouping', 'Component Preparation', 'Apheresis'
     ]
-  };
+  }), []);
 
   // Fetch tests
   const fetchTests = useCallback(async () => {
@@ -195,11 +195,13 @@ const PathologyTestManagement = () => {
   const fetchCategories = useCallback(async () => {
     try {
       const response = await api.get('/pathology/categories');
-      setCategories(response.data.categories);
+      const existingCategories = response.data.categories || [];
+      const predefinedCategories = Object.keys(predefinedTests);
+      setCategories([...new Set([...existingCategories, ...predefinedCategories])]);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  }, [api]);
+  }, [api, predefinedTests]);
 
   useEffect(() => {
     setLoading(true);

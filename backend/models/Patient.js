@@ -371,12 +371,12 @@ patientSchema.methods.markBillAsPaid = function(billId, paymentDetails) {
 // Only enforce uniqueness for actual generated numbers, not null/missing values
 patientSchema.index(
   { opdNumber: 1 },
-  { unique: true, partialFilterExpression: { opdNumber: { $exists: true, $ne: null } } }
+  { unique: true, partialFilterExpression: { opdNumber: { $type: 'string' } } }
 );
 
 patientSchema.index(
   { emergencyNumber: 1 },
-  { unique: true, partialFilterExpression: { emergencyNumber: { $exists: true, $ne: null } } }
+  { unique: true, partialFilterExpression: { emergencyNumber: { $type: 'string' } } }
 );
 
 module.exports = mongoose.model('Patient', patientSchema);

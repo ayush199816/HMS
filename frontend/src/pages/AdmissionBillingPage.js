@@ -41,6 +41,20 @@ const AdmissionBillingPage = () => {
   const [referenceNumber, setReferenceNumber] = useState('');
   const [billToPay, setBillToPay] = useState(null);
   const [admissionDateInput, setAdmissionDateInput] = useState('');
+  const [editingBill, setEditingBill] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editBillForm, setEditBillForm] = useState({
+    items: [],
+    discount: 0,
+    description: ''
+  });
+  const [editNewItem, setEditNewItem] = useState({
+    name: '',
+    quantity: 1,
+    price: 0,
+    hasTax: false
+  });
+  const [selectedEditAssistantDoctors, setSelectedEditAssistantDoctors] = useState([]);
 
   const fetchAdmissionDetails = useCallback(async () => {
     try {
@@ -120,6 +134,40 @@ const AdmissionBillingPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAssistantDoctors, assistantDoctors, billCalculation?.daysAdmitted]);
+
+  // Auto-add selected assistant doctors to edit bill items
+  useEffect(() => {
+    setEditBillForm(prev => {
+      if (selectedEditAssistantDoctors.length === 0 || assistantDoctors.length === 0) {
+        return { ...prev, items: prev.items.filter(item => !item.id?.startsWith('edit-assistant-')) };
+      }
+
+      const selectedIds = new Set(selectedEditAssistantDoctors);
+      const keptItems = prev.items.filter(item =>
+        item.id?.startsWith('edit-assistant-') && selectedIds.has(item.id.replace('edit-assistant-', ''))
+      );
+
+      const newDocIds = selectedEditAssistantDoctors.filter(docId =>
+        !keptItems.some(item => item.id === `edit-assistant-${docId}`)
+      );
+
+      const newItems = newDocIds.map(docId => {
+        const doctor = assistantDoctors.find(d => d._id === docId);
+        const price = doctor?.dailyVisitFee || 500;
+        return {
+          id: `edit-assistant-${docId}`,
+          name: doctor?.name || 'Assistant Doctor',
+          quantity: 1,
+          price: price,
+          total: price
+        };
+      });
+
+      const otherItems = prev.items.filter(item => !item.id?.startsWith('edit-assistant-'));
+      return { ...prev, items: [...otherItems, ...keptItems, ...newItems] };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEditAssistantDoctors, assistantDoctors]);
 
   // Pre-fill advance amount with total advance collected for full & final bills
   useEffect(() => {
@@ -245,6 +293,113 @@ const AdmissionBillingPage = () => {
       await fetchAdmissionDetails();
     } catch (error) {
       setError(error.response?.data?.message || 'Failed to delete bill');
+    }
+  };
+
+  const openEditModal = (bill) => {
+    setEditingBill(bill);
+
+    const selectedIds = (admission?.assistantDoctorIds || []).filter(docId => {
+      const doctor = assistantDoctors.find(d => d._id === docId);
+      return doctor && (bill.items || []).some(item => item.name === doctor.name);
+    });
+    setSelectedEditAssistantDoctors(selectedIds);
+
+    const initialItems = (bill.items || []).map((item, idx) => {
+      const matchingDoc = (admission?.assistantDoctorIds || [])
+        .map(id => assistantDoctors.find(d => d._id === id))
+        .find(d => d?.name === item.name);
+      const hasTax = !!item.hasTax;
+      const price = Number(item.price) || 0;
+      const qty = Number(item.quantity) || 1;
+      const total = hasTax ? price * qty * 1.05 : price * qty;
+      return {
+        ...item,
+        id: matchingDoc ? `edit-assistant-${matchingDoc._id}` : `edit-item-${idx}`,
+        hasTax,
+        price,
+        quantity: qty,
+        total
+      };
+    });
+
+    setEditBillForm({
+      items: initialItems,
+      discount: bill.discount || 0,
+      description: bill.description || ''
+    });
+    setEditNewItem({ name: '', quantity: 1, price: 0, hasTax: false });
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingBill(null);
+    setSelectedEditAssistantDoctors([]);
+    setEditBillForm({
+      items: [],
+      discount: 0,
+      description: ''
+    });
+    setEditNewItem({ name: '', quantity: 1, price: 0, hasTax: false });
+  };
+
+  const handleEditItemChange = (index, field, value) => {
+    setEditBillForm(prev => {
+      const items = [...prev.items];
+      const item = { ...items[index] };
+      if (field === 'name') {
+        item[field] = value;
+      } else if (field === 'hasTax') {
+        item[field] = value;
+      } else {
+        item[field] = Number(value) || 0;
+      }
+      const base = (Number(item.price) || 0) * (Number(item.quantity) || 0);
+      item.total = item.hasTax ? base * 1.05 : base;
+      items[index] = item;
+      return { ...prev, items };
+    });
+  };
+
+  const handleRemoveEditItem = (index) => {
+    setEditBillForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
+  };
+
+  const handleAddEditItem = () => {
+    setEditBillForm(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, price: 0, hasTax: false, total: 0 }] }));
+  };
+
+  const addEditCustomItem = () => {
+    if (editNewItem.name) {
+      const qty = Number(editNewItem.quantity) || 1;
+      const price = Number(editNewItem.price) || 0;
+      const hasTax = !!editNewItem.hasTax;
+      const total = hasTax ? qty * price * 1.05 : qty * price;
+      setEditBillForm(prev => ({
+        ...prev,
+        items: [
+          ...prev.items,
+          { name: editNewItem.name, quantity: qty, price: price, hasTax, total }
+        ]
+      }));
+      setEditNewItem({ name: '', quantity: 1, price: 0, hasTax: false });
+    }
+  };
+
+  const saveEditedBill = async () => {
+    if (!editingBill) return;
+    try {
+      const data = {
+        items: editBillForm.items,
+        discount: editBillForm.discount,
+        description: editBillForm.description
+      };
+      await api.put(`/billing/${editingBill._id}`, data);
+      await fetchAdmissionDetails();
+      closeEditModal();
+    } catch (error) {
+      setError(error.response?.data?.message || 'Failed to update bill');
     }
   };
 
@@ -482,7 +637,7 @@ const AdmissionBillingPage = () => {
                   // Initialize advance from balance to full available amount
                   setAdvanceFromBalance(admission?.patientId?.advanceBalance || 0);
                 }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center" style={{ backgroundColor: '#2563eb', color: '#fff' }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create New Bill
@@ -534,7 +689,7 @@ const AdmissionBillingPage = () => {
                     />
                     <button
                       onClick={updateAdmissionDate}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700" style={{ backgroundColor: '#2563eb', color: '#fff' }}
                     >
                       Update
                     </button>
@@ -574,7 +729,7 @@ const AdmissionBillingPage = () => {
                       </span>
                       <button
                         onClick={() => handleDownloadAndPrintBill(bill)}
-                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center"
+                        className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center" style={{ backgroundColor: '#16a34a', color: '#fff' }}
                       >
                         <Download className="h-4 w-4 mr-1" />
                         Print Bill
@@ -582,16 +737,24 @@ const AdmissionBillingPage = () => {
                       {['pending', 'partial'].includes(bill.status) && (
                         <button
                           onClick={() => markBillAsPaid(bill._id)}
-                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center"
+                          className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center" style={{ backgroundColor: '#2563eb', color: '#fff' }}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           {bill.status === 'partial' ? 'Pay Balance' : 'Mark as Paid'}
                         </button>
                       )}
+                      {bill.status !== 'paid' && (
+                        <button
+                          onClick={() => openEditModal(bill)}
+                          className="bg-yellow-600 text-white px-3 py-1 rounded text-sm hover:bg-yellow-700 flex items-center" style={{ backgroundColor: '#ca8a04', color: '#fff' }}
+                        >
+                          Edit
+                        </button>
+                      )}
                       {bill.status === 'pending' && (
                         <button
                           onClick={() => deleteBill(bill._id)}
-                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 flex items-center"
+                          className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 flex items-center" style={{ backgroundColor: '#dc2626', color: '#fff' }}
                         >
                           Delete
                         </button>
@@ -857,7 +1020,7 @@ const AdmissionBillingPage = () => {
                       </label>
                       <button
                         onClick={addCustomItem}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center" style={{ backgroundColor: '#2563eb', color: '#fff' }}
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add
@@ -1109,7 +1272,7 @@ const AdmissionBillingPage = () => {
                 )}
                 <button
                   onClick={createBill}
-                  className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 flex items-center"
+                  className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 flex items-center" style={{ backgroundColor: '#16a34a', color: '#fff' }}
                 >
                   <CheckCircle className="h-5 w-5 mr-2" />
                   Create Bill
@@ -1119,6 +1282,246 @@ const AdmissionBillingPage = () => {
           </div>
         )}
       </div>
+
+      {/* Edit Bill Modal */}
+      {showEditModal && (
+        <div style={{ position: 'fixed', inset: '0', backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div className="bg-white rounded-lg shadow-lg" style={{ width: '100%', maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Edit Bill</h2>
+                  <p className="text-sm text-gray-500 mt-1">{editingBill?.billNumber}</p>
+                </div>
+                <button onClick={closeEditModal} className="text-gray-400 hover:text-gray-600">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={editBillForm.description}
+                  onChange={(e) => setEditBillForm({ ...editBillForm, description: e.target.value })}
+                  className="form-input w-full"
+                  placeholder="Bill description"
+                />
+              </div>
+
+              {/* Bill Items Table */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden mb-6">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Item</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Rate</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">Tax 5%</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {editBillForm.items.map((item, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="text"
+                            value={item.name}
+                            onChange={(e) => handleEditItemChange(index, 'name', e.target.value)}
+                            className="form-input w-full"
+                            placeholder="Item name"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handleEditItemChange(index, 'quantity', e.target.value)}
+                            className="w-20 text-center border border-gray-300 rounded px-2 py-1"
+                            min="1"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <input
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => handleEditItemChange(index, 'price', e.target.value)}
+                            className="w-24 text-right border border-gray-300 rounded px-2 py-1"
+                            min="0"
+                            step="0.01"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-right font-medium">
+                          ₹{item.total?.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={item.hasTax}
+                            onChange={(e) => handleEditItemChange(index, 'hasTax', e.target.checked)}
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => handleRemoveEditItem(index)} className="text-red-600 hover:text-red-800">
+                            <X className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Add Additional Item */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                <p className="text-sm font-medium text-gray-700 mb-3">Add Additional Item</p>
+                <div className="grid grid-cols-6 gap-3">
+                  <input
+                    type="text"
+                    placeholder="Item name"
+                    value={editNewItem.name}
+                    onChange={(e) => setEditNewItem({ ...editNewItem, name: e.target.value })}
+                    className="form-input"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Qty"
+                    value={editNewItem.quantity}
+                    onChange={(e) => setEditNewItem({ ...editNewItem, quantity: parseInt(e.target.value) || 1 })}
+                    className="form-input"
+                    min="1"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Price"
+                    value={editNewItem.price}
+                    onChange={(e) => setEditNewItem({ ...editNewItem, price: parseFloat(e.target.value) || 0 })}
+                    className="form-input"
+                    min="0"
+                    step="0.01"
+                  />
+                  <label className="flex items-center justify-center bg-white border border-gray-200 rounded-lg px-3 cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={editNewItem.hasTax}
+                      onChange={(e) => setEditNewItem({ ...editNewItem, hasTax: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded mr-2"
+                    />
+                    <span className="text-sm text-gray-700">Tax 5%</span>
+                  </label>
+                  <div className="col-span-2">
+                    <button
+                      onClick={addEditCustomItem}
+                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center" style={{ backgroundColor: '#2563eb', color: '#fff' }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advance */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
+                <label className="block text-sm font-medium text-blue-900 mb-2">Advance Payment (₹)</label>
+                <input
+                  type="number"
+                  value={editingBill?.advanceAmount || 0}
+                  disabled
+                  className="form-input w-full bg-gray-100 cursor-not-allowed"
+                />
+              </div>
+
+              {/* Discount */}
+              <div className="bg-green-50 p-4 rounded-lg border border-green-100 mb-6">
+                <label className="block text-sm font-medium text-green-900 mb-2">Discount (₹)</label>
+                <input
+                  type="number"
+                  value={editBillForm.discount}
+                  onChange={(e) => setEditBillForm({ ...editBillForm, discount: parseFloat(e.target.value) || 0 })}
+                  className="form-input w-full"
+                  min="0"
+                  step="0.01"
+                  placeholder="Enter discount amount"
+                />
+              </div>
+
+              {/* Assistant Doctors Selection */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
+                <p className="text-sm font-medium text-blue-900 mb-3">Assistant Doctors (Optional)</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {assistantDoctors.map(doctor => (
+                    <label
+                      key={doctor._id}
+                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedEditAssistantDoctors.includes(doctor._id)
+                          ? 'border-blue-500 bg-blue-100'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedEditAssistantDoctors.includes(doctor._id)}
+                        onChange={() => {
+                          setSelectedEditAssistantDoctors(prev =>
+                            prev.includes(doctor._id)
+                              ? prev.filter(id => id !== doctor._id)
+                              : [...prev, doctor._id]
+                          );
+                        }}
+                        className="mr-3"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">Dr. {doctor.name}</p>
+                        <p className="text-xs text-gray-500">{doctor.specialities?.join(', ') || 'Doctor'}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Totals */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div>
+                  <p className="text-sm text-gray-500">
+                    Subtotal: ₹{editBillForm.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0).toFixed(2)}
+                  </p>
+                  {editBillForm.discount > 0 && (
+                    <p className="text-sm text-green-600">Discount: -₹{editBillForm.discount.toFixed(2)}</p>
+                  )}
+                  {editingBill?.advanceAmount > 0 && (
+                    <p className="text-sm text-blue-600">Advance: -₹{editingBill.advanceAmount.toFixed(2)}</p>
+                  )}
+                  <p className="text-2xl font-bold text-gray-900">
+                    Total: ₹{(
+                      editBillForm.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0) - editBillForm.discount - (editingBill?.advanceAmount || 0)
+                    ).toFixed(2)}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={closeEditModal}
+                    className="bg-gray-200 text-gray-800 px-4 py-2 rounded hover:bg-gray-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEditedBill}
+                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" style={{ backgroundColor: '#2563eb', color: '#fff' }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment Modal - Outside main container to avoid clipping */}
       {showPaymentModal && (

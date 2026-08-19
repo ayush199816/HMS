@@ -601,6 +601,64 @@ router.delete('/:billId', authenticate, async (req, res) => {
   }
 });
 
+// Update bill (only if not paid)
+router.put('/:billId', authenticate, async (req, res) => {
+  try {
+    const billId = req.params.billId;
+    const Bill = require('../models/Bill');
+    const bill = await Bill.findById(billId);
+
+    if (!bill) {
+      return res.status(404).json({ message: 'Bill not found' });
+    }
+
+    // Check hospital access
+    const userHospitalId = req.user.hospitalId._id ? req.user.hospitalId._id.toString() : req.user.hospitalId.toString();
+    const patient = await Patient.findById(bill.patientId);
+    if (!patient) {
+      return res.status(404).json({ message: 'Patient not found' });
+    }
+    const patientHospitalId = patient.hospitalId.toString();
+    if (req.user.role !== 'super_admin' && userHospitalId !== patientHospitalId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Do not allow editing paid bills
+    if (bill.status === 'paid') {
+      return res.status(400).json({ message: 'Paid bills cannot be edited' });
+    }
+
+    const { items, discount, description } = req.body;
+
+    if (items) {
+      bill.items = items.map(item => ({
+        name: item.name,
+        quantity: Number(item.quantity) || 1,
+        price: Number(item.price) || 0,
+        total: Number(item.total) || ((Number(item.price) || 0) * (Number(item.quantity) || 0)),
+        hasTax: item.hasTax === true
+      }));
+      bill.amount = bill.items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
+    }
+
+    if (discount !== undefined) {
+      bill.discount = Number(discount) || 0;
+    }
+
+    if (description !== undefined) {
+      bill.description = description;
+    }
+
+    bill.tax = 0;
+
+    await bill.save();
+    res.json(bill);
+  } catch (error) {
+    console.error('Update bill error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get financial statement (collections, refunds, purchases) for the hospital
 router.get('/statement', authenticate, authorize('accounts', 'hospital_admin', 'super_admin'), async (req, res) => {
   try {

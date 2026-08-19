@@ -169,6 +169,10 @@ const billSchema = new mongoose.Schema({
       type: Number,
       required: true,
       min: 0
+    },
+    hasTax: {
+      type: Boolean,
+      default: false
     }
   }],
   notes: String

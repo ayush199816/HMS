@@ -22,6 +22,7 @@ async function generateAdmissionBillPDF(bill, admission, hospital, patient, crea
       doc.on('error', reject);
 
       const isAdvanceBill = bill.isAdvanceBill || bill.type === 'admission_advance';
+      const hasPreviousBills = bill.previousBills && bill.previousBills.length > 0;
 
       // Header Section - Hospital Information
       doc.fontSize(20).font('Helvetica-Bold').text(hospital.name, { align: 'center' });
@@ -172,7 +173,7 @@ async function generateAdmissionBillPDF(bill, admission, hospital, patient, crea
         doc.moveDown(0.5);
 
         // Table 4: PREVIOUS ADVANCE PAYMENTS
-        if (bill.previousBills && bill.previousBills.length > 0) {
+        if (hasPreviousBills) {
           doc.fontSize(12).font('Helvetica-Bold').text('4. PREVIOUS ADVANCE PAYMENTS:');
           
           const advanceItems = bill.previousBills
@@ -192,7 +193,7 @@ async function generateAdmissionBillPDF(bill, admission, hospital, patient, crea
 
       // BILLING DETAILS - Only for full & final bills
       if (!isAdvanceBill) {
-        doc.fontSize(12).font('Helvetica-Bold').text('5. BILLING DETAILS:');
+        doc.fontSize(12).font('Helvetica-Bold').text(hasPreviousBills ? '5. BILLING DETAILS:' : '4. BILLING DETAILS:');
         
         const paymentDate = bill.billDate ? new Date(bill.billDate).toLocaleDateString('en-GB', {
           day: '2-digit',
@@ -299,7 +300,8 @@ function drawTableBox(doc, items) {
     doc.fontSize(11).font('Helvetica').text(item.value, startX + 120, textY);
   });
   
-  // Move cursor to exactly below the box
+  // Reset cursor to the left margin below the box
+  doc.x = 50;
   doc.y = startY + boxHeight + 10;
 }
 

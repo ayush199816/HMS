@@ -318,101 +318,103 @@ const BedManagement = () => {
           </div>
         </div>
 
-        {/* Add/Edit Form */}
+        {/* Add/Edit Form Modal */}
         {showForm && (
-          <div className="bed-card">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {editingBed ? 'Edit Bed' : 'Add New Bed'}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bed Number *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.bedNumber}
-                    onChange={(e) => setFormData({ ...formData, bedNumber: e.target.value })}
-                    className="form-input"
-                    placeholder="e.g., B-101"
-                  />
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                {editingBed ? 'Edit Bed' : 'Add New Bed'}
+              </h2>
+              <form onSubmit={handleSubmit}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bed Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.bedNumber}
+                      onChange={(e) => setFormData({ ...formData, bedNumber: e.target.value })}
+                      className="form-input"
+                      placeholder="e.g., B-101"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ward Type *</label>
+                    <select
+                      required
+                      value={formData.wardType}
+                      onChange={(e) => setFormData({ ...formData, wardType: e.target.value })}
+                      className="form-select"
+                    >
+                      <option value="emergency">Emergency</option>
+                      <option value="icu">ICU</option>
+                      <option value="general_ward">General Ward</option>
+                      <option value="private_ward">Private Ward</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
+                    <input
+                      type="number"
+                      value={formData.floor}
+                      onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
+                      className="form-input"
+                      placeholder="e.g., 1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
+                    <input
+                      type="text"
+                      value={formData.roomNumber}
+                      onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+                      className="form-input"
+                      placeholder="e.g., 101"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Price Per Day (₹)</label>
+                    <input
+                      type="number"
+                      value={formData.pricePerDay}
+                      onChange={(e) => setFormData({ ...formData, pricePerDay: e.target.value })}
+                      className="form-input"
+                      placeholder="e.g., 1000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amenities (comma separated)</label>
+                    <input
+                      type="text"
+                      value={formData.amenities}
+                      onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
+                      className="form-input"
+                      placeholder="e.g., TV, AC, Oxygen"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ward Type *</label>
-                  <select
-                    required
-                    value={formData.wardType}
-                    onChange={(e) => setFormData({ ...formData, wardType: e.target.value })}
-                    className="form-select"
+                <div className="flex justify-end gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForm(false);
+                      setEditingBed(null);
+                    }}
+                    className="btn btn-secondary"
+                    disabled={submitting}
                   >
-                    <option value="emergency">Emergency</option>
-                    <option value="icu">ICU</option>
-                    <option value="general_ward">General Ward</option>
-                    <option value="private_ward">Private Ward</option>
-                  </select>
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Saving...' : (editingBed ? 'Update Bed' : 'Add Bed')}
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
-                  <input
-                    type="number"
-                    value={formData.floor}
-                    onChange={(e) => setFormData({ ...formData, floor: e.target.value })}
-                    className="form-input"
-                    placeholder="e.g., 1"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
-                  <input
-                    type="text"
-                    value={formData.roomNumber}
-                    onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
-                    className="form-input"
-                    placeholder="e.g., 101"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price Per Day (₹)</label>
-                  <input
-                    type="number"
-                    value={formData.pricePerDay}
-                    onChange={(e) => setFormData({ ...formData, pricePerDay: e.target.value })}
-                    className="form-input"
-                    placeholder="e.g., 1000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amenities (comma separated)</label>
-                  <input
-                    type="text"
-                    value={formData.amenities}
-                    onChange={(e) => setFormData({ ...formData, amenities: e.target.value })}
-                    className="form-input"
-                    placeholder="e.g., TV, AC, Oxygen"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowForm(false);
-                    setEditingBed(null);
-                  }}
-                  className="btn btn-secondary"
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Saving...' : (editingBed ? 'Update Bed' : 'Add Bed')}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         )}
 

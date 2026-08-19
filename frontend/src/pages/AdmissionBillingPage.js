@@ -267,20 +267,18 @@ const AdmissionBillingPage = () => {
       const billNumber = (bill.billNumber || bill._id).replace(/\s+/g, '-');
       const filename = `${patientName}-${billNumber}.pdf`;
       
-      const printWindow = window.open(url, '_blank');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       
+      const printWindow = window.open(url, '_blank');
       if (printWindow) {
         printWindow.onload = () => {
           printWindow.print();
         };
-      } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        alert('Popup was blocked. Bill downloaded instead.');
       }
       
       setTimeout(() => {

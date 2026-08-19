@@ -366,10 +366,6 @@ const AdmissionBillingPage = () => {
     setEditBillForm(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   };
 
-  const handleAddEditItem = () => {
-    setEditBillForm(prev => ({ ...prev, items: [...prev.items, { name: '', quantity: 1, price: 0, hasTax: false, total: 0 }] }));
-  };
-
   const addEditCustomItem = () => {
     if (editNewItem.name) {
       const qty = Number(editNewItem.quantity) || 1;

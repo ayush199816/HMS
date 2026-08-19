@@ -269,10 +269,16 @@ function drawTableBox(doc, items) {
   const lineHeight = 25;
   const startX = boxX + 10;
   const labelOffset = 8;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const boxHeight = items.length * lineHeight;
+  
+  // If the table won't fit on the current page, start it on a new page
+  if (doc.y + boxHeight > pageBottom) {
+    doc.addPage();
+  }
   
   // Store current Y position
   const startY = doc.y;
-  const boxHeight = items.length * lineHeight;
   
   // Draw box border
   doc.rect(boxX, startY, boxWidth, boxHeight).stroke();

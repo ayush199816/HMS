@@ -99,14 +99,10 @@ const patientSchema = new mongoose.Schema({
     default: Date.now
   },
   opdNumber: {
-    type: String,
-    unique: true,
-    sparse: true
+    type: String
   },
   emergencyNumber: {
-    type: String,
-    unique: true,
-    sparse: true
+    type: String
   },
   
   // Status
@@ -222,7 +218,8 @@ patientSchema.pre('save', async function(next) {
   // Generate OPD/Emergency number for new patients
   if (this.isNew) {
     // Generate appropriate number based on patient type
-    if (this.patientType === 'opd' && !this.opdNumber) {
+    // Generate OPD number for all new patients
+    if (!this.opdNumber) {
       const year = new Date().getFullYear();
       const prefix = 'OPD';
       
@@ -248,7 +245,10 @@ patientSchema.pre('save', async function(next) {
       } catch (error) {
         console.error('Error generating OPD number:', error);
       }
-    } else if (this.patientType === 'emergency' && !this.emergencyNumber) {
+    }
+    
+    // Generate emergency number for emergency patients
+    if (this.patientType === 'emergency' && !this.emergencyNumber) {
       const year = new Date().getFullYear();
       const prefix = 'EMG';
       
@@ -367,5 +367,16 @@ patientSchema.methods.markBillAsPaid = function(billId, paymentDetails) {
   }
   return this.save();
 };
+
+// Only enforce uniqueness for actual generated numbers, not null/missing values
+patientSchema.index(
+  { opdNumber: 1 },
+  { unique: true, partialFilterExpression: { opdNumber: { $exists: true, $ne: null } } }
+);
+
+patientSchema.index(
+  { emergencyNumber: 1 },
+  { unique: true, partialFilterExpression: { emergencyNumber: { $exists: true, $ne: null } } }
+);
 
 module.exports = mongoose.model('Patient', patientSchema);

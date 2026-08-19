@@ -785,6 +785,10 @@ router.get('/:billId/pdf', authenticate, async (req, res) => {
     const { generateAdmissionBillPDF } = require('../utils/generateAdmissionBillPDF');
     const { generateBillPDF } = require('../utils/generateBillPDF');
 
+    const patientName = (bill.patientId?.name || 'patient').replace(/\s+/g, '-');
+    const safeBillNumber = (bill.billNumber || billId).replace(/\s+/g, '-');
+    const pdfFilename = `${patientName}-${safeBillNumber}.pdf`;
+
     let pdfBuffer;
 
     if (bill.type === 'admission') {
@@ -806,7 +810,7 @@ router.get('/:billId/pdf', authenticate, async (req, res) => {
         bill.createdBy
       );
 
-      res.setHeader('Content-Disposition', `attachment; filename=admission-bill-${billId}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=${pdfFilename}`);
     } else {
       // For other bill types, attempt to fetch a related reference if available
       let related = null;
@@ -833,7 +837,7 @@ router.get('/:billId/pdf', authenticate, async (req, res) => {
         bill.createdBy
       );
 
-      res.setHeader('Content-Disposition', `attachment; filename=${bill.type || 'bill'}-bill-${billId}.pdf`);
+      res.setHeader('Content-Disposition', `attachment; filename=${pdfFilename}`);
     }
 
     res.setHeader('Content-Type', 'application/pdf');

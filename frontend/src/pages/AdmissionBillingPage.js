@@ -248,12 +248,12 @@ const AdmissionBillingPage = () => {
     }
   };
 
-  const handleDownloadAndPrintBill = async (billId) => {
+  const handleDownloadAndPrintBill = async (bill) => {
     try {
       const token = localStorage.getItem('token');
       const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
       
-      const response = await axios.get(`${baseURL}/billing/${billId}/pdf`, {
+      const response = await axios.get(`${baseURL}/billing/${bill._id}/pdf`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -262,6 +262,10 @@ const AdmissionBillingPage = () => {
       
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
+      
+      const patientName = (admission?.patientId?.name || bill?.patientId?.name || 'patient').replace(/\s+/g, '-');
+      const billNumber = (bill.billNumber || bill._id).replace(/\s+/g, '-');
+      const filename = `${patientName}-${billNumber}.pdf`;
       
       const printWindow = window.open(url, '_blank');
       
@@ -272,7 +276,7 @@ const AdmissionBillingPage = () => {
       } else {
         const a = document.createElement('a');
         a.href = url;
-        a.download = `admission-bill-${billId}.pdf`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -571,7 +575,7 @@ const AdmissionBillingPage = () => {
                         {bill.status === 'refund_due' ? 'REFUND DUE' : bill.status?.toUpperCase()}
                       </span>
                       <button
-                        onClick={() => handleDownloadAndPrintBill(bill._id)}
+                        onClick={() => handleDownloadAndPrintBill(bill)}
                         className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 flex items-center"
                       >
                         <Download className="h-4 w-4 mr-1" />

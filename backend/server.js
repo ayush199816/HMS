@@ -20,9 +20,17 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch((err) => console.error('MongoDB connection error:', err));
+}).then(async () => {
+  console.log('MongoDB connected successfully');
+  try {
+    const Patient = require('./models/Patient');
+    try { await Patient.collection.dropIndex('opdNumber_1'); } catch (e) { /* index may not exist */ }
+    try { await Patient.collection.dropIndex('emergencyNumber_1'); } catch (e) { /* index may not exist */ }
+    await Patient.syncIndexes();
+  } catch (err) {
+    console.error('Patient index sync error:', err);
+  }
+}).catch((err) => console.error('MongoDB connection error:', err));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
